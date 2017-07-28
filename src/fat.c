@@ -146,7 +146,7 @@ int mount(struct fatfs *fs)
     uint16_t root_ents = LD_WORD(fs->win + BPB_ROOTENTS);
     printf("Root entries: %d\n", root_ents);
     uint32_t root_secs;
-    root_secs = ((fs->root_ents * 32) + (fs->bps -1)) / fs->bps;
+    root_secs = ((root_ents * 32) + (fs->bps -1)) / fs->bps;
     printf("Root sectors: %d\n", root_secs);
     uint32_t fatsz;
     fatsz = LD_WORD(fs->win + BPB_FATSz16);
@@ -154,12 +154,12 @@ int mount(struct fatfs *fs)
         fatsz = LD_DWORD(fs->win + BPB_FATSz32);
 
     printf("FAT size: %d\n", fatsz);
-    fs->num_fats = fs->win[BPB_NUMFATS];
-    printf("Number of FATs: %d\n", fs->num_fats);
+    uint8_t num_fats = fs->win[BPB_NUMFATS];
+    printf("Number of FATs: %d\n", num_fats);
     uint16_t rsvd_sec;
     rsvd_sec = LD_WORD(fs->win + BPB_RSVD_SEC);
     printf("Reserved sectors: %d\n", rsvd_sec);
-    fs->database = rsvd_sec + (fs->num_fats * fatsz) + root_secs;
+    fs->database = rsvd_sec + (num_fats * fatsz) + root_secs;
     printf("Data sector base relative to boot sector: %d\n", fs->database);
     fs->database += fs->bsect;
     printf("Data sector base: %d\n", fs->database);
@@ -169,7 +169,7 @@ int mount(struct fatfs *fs)
         totsec = LD_DWORD(fs->win + BPB_TOTSEC32);
     printf("Total sectors: %d\n", totsec);
     uint32_t datasec;
-    datasec = totsec - (rsvd_sec + (fs->num_fats * fatsz) + root_secs);
+    datasec = totsec - (rsvd_sec + (num_fats * fatsz) + root_secs);
     printf("Data sectors: %d\n", datasec);
     uint32_t nclusts;
     nclusts = datasec / fs->spc;
