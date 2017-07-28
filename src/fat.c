@@ -35,6 +35,7 @@
 #define BPB_FATSz16     22
 #define BPB_TOTSEC32    32
 #define BPB_FATSz32     36
+#define BPB_ROOTCLUS    44
 #define BS_FSTYPE       54
 #define BS_FSTYPE32     82
 #define BS_MBR          446
@@ -48,7 +49,7 @@
 #define LD_WORD(ptr)        (uint16_t)(*(uint16_t *)(ptr))
 #define LD_DWORD(ptr)       (uint32_t)(*(uint32_t *)(ptr))
 
-int print_array(uint8_t *buf, int len)
+static int print_array(uint8_t *buf, int len)
 {
     char *bugger = malloc(sizeof(uint8_t) * ((len * 2) + 3));
     char *ptr = bugger;
@@ -68,7 +69,7 @@ int print_array(uint8_t *buf, int len)
     return 0;
 }
 
-int check_fs(struct fatfs *fs)
+static int check_fs(struct fatfs *fs)
 {
     if (LD_WORD(fs->win + BS_55AA) != 0xAA55) {
         return -1;
@@ -114,7 +115,7 @@ int get_fat(struct fatfs *fs, int clust)
     return -2;
 }
 
-int clust2sect(struct fatfs *fs, uint32_t clust)
+static int clust2sect(struct fatfs *fs, uint32_t clust)
 {
     clust -= 2;
     return ((clust * fs->spc + fs->database));
@@ -176,6 +177,8 @@ int mount(struct fatfs *fs)
     printf("Total clusters: %d\n", nclusts);
     fs->fatbase = rsvd_sec + fs->bsect;
     printf("FAT base: %d\n", fs->fatbase);
+    fs->dirbase = clust2sect(fs, LD_DWORD(fs->win + BPB_ROOTCLUS));
+    printf("Root dir start: 0x%08X\n", fs->dirbase * 512);
 
     // fat type determination
 
@@ -213,4 +216,99 @@ int walk_fat(struct fatfs *fs)
     }
     printf("Found first free fat entry at 0x%04X\n", ((fs->fatbase * fs->bps) + (clust * 4)));
     return clust;
+}
+
+static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
+{
+    if (dj->clust == 1 || dj->clust >= fs->n_fatent)
+        return -1;
+
+    if (!dj->clust) {
+        dj->sect = fs->dirbase;
+    } else {
+        dj->sect = clust2sect(fs, dj->clust);
+    }
+
+    printf("rewinding to sector 0x%08X\n", dj->sect);
+    printf("rewinding to offset 0x%08X\n", dj->sect * 512);
+
+    return 0;
+}
+
+static int dir_read(struct fatfs *fs, struct fatfs_dir *dj)
+{
+    if (!fs || !dj)
+        return -1;
+
+    mb_read(fs->fd, fs->win, 0, (dj->sect * 512), 512);
+    print_array(fs->win, 512);
+    uint8_t *off = fs->win;
+    while (2 > 1) {
+        if (!*off)
+            break;
+        if (*(off + 11) & 0x0F) {
+            printf("Found LFN entry\n");
+            off += 32;
+            continue;
+        } else {
+            int i;
+            for (i = 0; i < 8; i++) {   /* Copy file name body */
+                dj->fn[i] = off[i];
+                if (dj->fn[i] == ' ') break;
+            }
+            dj->fn[i] = 0x00;
+            printf("Found root dir entry: %s\n", dj->fn);
+            off += 32;
+            continue;
+
+        }
+    }
+
+    return 0;
+}
+
+static int follow_path(struct fatfs *fs, struct fatfs_dir *dj, char *path)
+{
+    int res;
+
+    while (*path == ' ')
+        path++;
+
+    if (*path == '/')
+        path++;
+
+    dj->clust = 0;
+
+    if (*path < ' ') {
+        res = dir_rewind(fs, dj);
+    }
+
+    return 0;
+}
+
+int open_dir(struct fatfs *fs, struct fatfs_dir *dj, char *path)
+{
+    if (!fs || !dj || !path)
+        return -1;
+
+    int ret = follow_path(fs, dj, path);
+    if (ret)
+        return ret;
+
+
+}
+
+int read_dir(struct fatfs *fs, struct fatfs_dir *dj)
+{
+    if (!fs || !dj)
+        return -1;
+
+
+    int res = dir_read(fs, dj);
+    if (res)
+        return -1;
+
+    //printf("found dir named %s\n", dj->fn);
+
+    return 0;
 }

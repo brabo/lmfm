@@ -2,7 +2,7 @@ CC=gcc
 
 CFLAGS=-I. --std=gnu99 -I./include -fms-extensions
 
-LMFM_OBJ=src/mockblock.o src/fat.o src/lmfm.o
+LMFM_OBJ=src/mockblock.o src/fat.o src/binutils.o src/lmfm.o
 
 LDFLAGS=
 LDLIBS=

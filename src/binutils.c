@@ -1,9 +1,10 @@
 /*
- *      Lean Mean FAT Machine
+ *      binutils.c: basic binutils for lmfm
  *
  *      This is free software: you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License version 2, as
  *      published by the Free Software Foundation.
+ *
  *
  *      This is distributed in the hope that it will be useful,
  *      but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,34 +22,23 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "fat.h"
-#include "mockblock.h"
-#include "binutils.h"
 
-int main(int argc, char **argv)
+int ls(struct fatfs *fs, char *path)
 {
-    struct fatfs *fs = malloc(1 * sizeof (struct fatfs));
-    fs->bsect = 0;
+    if (!fs || !path)
+        return -1;
 
-    if (argc != 2)
-        exit(1);
+    printf("trying to read directory %s\n", path);
 
-    fs->fd = mb_init(argv[1]);
+    struct fatfs_dir dj;
+    char fname[12];
+    dj.fn = fname;
 
-    if (fs->fd < 0)
-        exit(2);
 
-    mount(fs);
+    open_dir(fs, &dj, path);
+    printf("trying to read directory at 0x%08X\n", dj.sect * 512);
 
-    uint32_t fat = get_fat(fs, 2);
-    printf("FAT 2: 0x%08X\n", fat);
-    fat = get_fat(fs, 0x0b);
-    printf("FAT 0x0b: 0x%08X\n", fat);
-    uint32_t next = walk_fat(fs);
-    fat = get_fat(fs, next);
-    printf("FAT 0x%08X: 0x%08X\n", (fs->fatbase * fs->bps) + (next * 4), fat);
+    read_dir(fs, &dj);
 
-    ls(fs, "/");
-
-    // if you're happy and you know it,
-    exit(0);
+    return 0;
 }
