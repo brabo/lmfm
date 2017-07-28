@@ -193,19 +193,19 @@ int mount(struct fatfs *fs)
     nclusts = datasec / fs->spc;
     printf("Total clusters: %d\n", nclusts);
     fs->fatbase = rsvd_sec + fs->bsect;
-    printf("FAT base: %d!\n", fs->fatbase);
+    printf("FAT base: %d\n", fs->fatbase);
 
     // fat type determination
 
     if (nclusts < 4085) {
         fs->type = FAT12;
-        printf("Reality check: is FAT12!\n");
+        printf("Reality check: is FAT12\n");
     } else if (nclusts < 65525) {
         fs->type = FAT16;
-        printf("Reality check: is FAT16!\n");
+        printf("Reality check: is FAT16\n");
     } else {
         fs->type = FAT32;
-        printf("Reality check: is FAT32!\n");
+        printf("Reality check: is FAT32\n");
     }
 
     fs->n_fatent = nclusts + 2;
@@ -221,7 +221,12 @@ int walk_fat(struct fatfs *fs)
         fat = get_fat(fs, clust);
         if (!fat)
             break;
-        printf("Found FAT entry: 0x%08X\n", fat);
+        if ((0x00000001 < fat) && (fat < 0x0FFFFFF0))
+            printf("Found FAT entry: 0x%08X\n", fat);
+        else if (fat > 0x0FFFFFF7)
+            printf("Found EOC FAT entry: 0x%08X\n", fat);
+        else
+            printf("Found special FAT entry: 0x%08X\n", fat);
         clust++;
     }
     printf("Found first free fat entry at 0x%04X\n", ((fs->fatbase * fs->bps) + (clust * 4)));
