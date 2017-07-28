@@ -2,17 +2,17 @@ CC=gcc
 
 CFLAGS=-I. --std=gnu99 -I./include -fms-extensions
 
-FAT_OBJ=src/mockblock.o src/fat.o
+LMFM_OBJ=src/mockblock.o src/fat.o src/lmfm.o
 
 LDFLAGS=
 LDLIBS=
 
 
-fat: $(FAT_OBJ)
-	$(CC) -o $@ $(FAT_OBJ) $(CFLAGS) $(LDFLAGS) $(LDLIBS)
-	rm -f $(FAT_OBJ)
+lmfm: $(LMFM_OBJ)
+	$(CC) -o $@ $(LMFM_OBJ) $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+	rm -f $(LMFM_OBJ)
 
-all: fat
+all: lmfm
 
 clean:
-	rm -f src/*.o fat
+	rm -f src/*.o lmfm

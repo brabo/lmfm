@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include "fat.h"
 #include "mockblock.h"
 
 #define BS_JMPBOOT      0
@@ -46,25 +47,6 @@
 
 #define LD_WORD(ptr)        (uint16_t)(*(uint16_t *)(ptr))
 #define LD_DWORD(ptr)       (uint32_t)(*(uint32_t *)(ptr))
-
-struct bpb {
-    uint16_t    bps;
-    uint8_t     spc;
-    uint16_t    rsvd_sec;
-    uint8_t     num_fats;
-    uint8_t     root_ents;
-};
-
-struct fatfs {
-    int         fd;
-    uint8_t     win[512];
-    uint32_t    bsect;
-    uint8_t     type;
-    struct bpb;
-    uint32_t    database;
-    uint32_t    fatbase;
-    uint32_t    n_fatent;
-};
 
 int print_array(uint8_t *buf, int len)
 {
@@ -231,31 +213,4 @@ int walk_fat(struct fatfs *fs)
     }
     printf("Found first free fat entry at 0x%04X\n", ((fs->fatbase * fs->bps) + (clust * 4)));
     return clust;
-}
-
-int main(int argc, char **argv)
-{
-    struct fatfs *fs = malloc(1 * sizeof (struct fatfs));
-    fs->bsect = 0;
-
-    if (argc != 2)
-        exit(1);
-
-    fs->fd = mb_init(argv[1]);
-
-    if (fs->fd < 0)
-        exit(2);
-
-    mount(fs);
-
-    uint32_t fat = get_fat(fs, 2);
-    printf("FAT 2: 0x%08X\n", fat);
-    fat = get_fat(fs, 0x0b);
-    printf("FAT 0x0b: 0x%08X\n", fat);
-    uint32_t next = walk_fat(fs);
-    fat = get_fat(fs, next);
-    printf("FAT 0x%08X: 0x%08X\n", (fs->fatbase * fs->bps) + (next * 4), fat);
-
-    // if you're happy and you know it,
-    exit(0);
 }
