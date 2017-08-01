@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include "fat.h"
 #include "mockblock.h"
 
@@ -41,6 +42,14 @@
 #define BS_MBR          446
 #define BS_55AA         510
 
+#define DIR_NAME        0
+#define DIR_ATTR        11
+#define DIR_SCLUST_HI   20
+#define DIR_SCLUST_LO   26
+#define DIR_FSIZE       28
+
+
+
 #define FAT12   1
 #define FAT16   2
 #define FAT32   3
@@ -49,7 +58,7 @@
 #define LD_WORD(ptr)        (uint16_t)(*(uint16_t *)(ptr))
 #define LD_DWORD(ptr)       (uint32_t)(*(uint32_t *)(ptr))
 
-static int print_array(uint8_t *buf, int len)
+int print_array(uint8_t *buf, int len)
 {
     char *bugger = malloc(sizeof(uint8_t) * ((len * 2) + 3));
     char *ptr = bugger;
@@ -100,14 +109,11 @@ int get_fat(struct fatfs *fs, int clust)
 
     switch(fs->type) {
     case FAT12:
-        //printf("FAT12\n");
         break;
     case FAT16:
         if (mb_read(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 2))) * fs->bps, fs->bps)) break;
         return LD_WORD(fs->win + (clust * 2));
     case FAT32:
-        //printf("FAT32\n");
-        //printf("trying to read address 0x%08X\n", (fs->fatbase + (clust / (fs->bps / 4))) * fs->bps);
         if (!mb_read(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 4))) * fs->bps, fs->bps)) break;
 
         return (LD_DWORD(fs->win + ((clust * 4) % fs->bps)) & 0x0FFFFFFF);
@@ -120,6 +126,20 @@ static int clust2sect(struct fatfs *fs, uint32_t clust)
     clust -= 2;
     return ((clust * fs->spc + fs->database));
 }
+
+static int get_clust(struct fatfs *fs, uint8_t* dir)
+{
+    int clst = 0;
+
+    if (fs->type == FAT32) {
+        clst = LD_WORD(dir + DIR_SCLUST_HI);
+        clst <<= 16;
+    }
+    clst |= LD_WORD(dir + DIR_SCLUST_LO);
+
+    return clst;
+}
+
 
 int mount(struct fatfs *fs)
 {
@@ -135,7 +155,6 @@ int mount(struct fatfs *fs)
             exit(3);
         }
         if (fs->type == FAT32) {
-            //printf("FAT32 found!\n");
         }
     }
     printf("Boot sector: %d\n", fs->bsect);
@@ -214,23 +233,20 @@ int walk_fat(struct fatfs *fs)
             printf("Found special FAT entry: 0x%08X\n", fat);
         clust++;
     }
-    printf("Found first free fat entry at 0x%04X\n", ((fs->fatbase * fs->bps) + (clust * 4)));
+
     return clust;
 }
 
 static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
 {
-    if (dj->clust == 1 || dj->clust >= fs->n_fatent)
+    if (dj->cclust == 1 || dj->cclust >= fs->n_fatent)
         return -1;
 
-    if (!dj->clust) {
+    if (!dj->cclust) {
         dj->sect = fs->dirbase;
     } else {
-        dj->sect = clust2sect(fs, dj->clust);
+        dj->sect = clust2sect(fs, dj->cclust);
     }
-
-    printf("rewinding to sector 0x%08X\n", dj->sect);
-    printf("rewinding to offset 0x%08X\n", dj->sect * 512);
 
     return 0;
 }
@@ -240,15 +256,15 @@ static int dir_read(struct fatfs *fs, struct fatfs_dir *dj)
     if (!fs || !dj)
         return -1;
 
-    mb_read(fs->fd, fs->win, 0, (dj->sect * 512), 512);
-    print_array(fs->win, 512);
-    uint8_t *off = fs->win;
+    mb_read(fs->fd, fs->win, 0, (dj->sect * fs->bps), fs->bps);
+    print_array(fs->win, fs->bps);
+
     while (2 > 1) {
-        if (!*off)
-            break;
-        if (*(off + 11) & 0x0F) {
-            printf("Found LFN entry\n");
-            off += 32;
+        uint8_t *off = fs->win + dj->off;
+        if (!*off) /* Free FAT entry, no more FAT entries! */
+            return -2;
+        if (*(off + DIR_ATTR) & 0x0F) { /* LFN entry */
+            dj->off += 32;
             continue;
         } else {
             int i;
@@ -257,14 +273,33 @@ static int dir_read(struct fatfs *fs, struct fatfs_dir *dj)
                 if (dj->fn[i] == ' ') break;
             }
             dj->fn[i] = 0x00;
-            printf("Found root dir entry: %s\n", dj->fn);
-            off += 32;
-            continue;
-
+            dj->attr = *(off + DIR_ATTR);
+            dj->sclust = get_clust(fs, off);
+            dj->fsize = LD_DWORD(off + DIR_FSIZE);
+            dj->off += 32;
+            break;
         }
     }
 
     return 0;
+}
+
+static int dir_find(struct fatfs *fs, struct fatfs_dir *dj, char *path)
+{
+    if (!fs || !dj || !path)
+        return -1;
+
+    while (dir_read(fs, dj) == 0) {
+        if (!strncmp(dj->fn, path, 11)) {
+            dj->off -= 32;
+            uint32_t fat = get_fat(fs, dj->sclust);
+            dj->sect = clust2sect(fs, dj->sclust);
+            dj->cclust = dj->sclust;
+            return 0;
+        }
+    }
+
+    return -2;
 }
 
 static int follow_path(struct fatfs *fs, struct fatfs_dir *dj, char *path)
@@ -277,16 +312,34 @@ static int follow_path(struct fatfs *fs, struct fatfs_dir *dj, char *path)
     if (*path == '/')
         path++;
 
-    dj->clust = 0;
+    dj->cclust = 0;
 
+    res = dir_rewind(fs, dj);
     if (*path < ' ') {
-        res = dir_rewind(fs, dj);
+        return res;
     }
+
+    dj->off = 0;
+
+    do {
+        char tpath[12];
+        char *tpathp = tpath;
+
+        while ((*path != '/') && (*path != ' ') && (*path != 0x00)) {
+            *tpathp++ = *path++;
+
+        }
+        *tpathp = 0x00;
+        dir_find(fs, dj, tpath);
+        if (*path == '/')
+            path++;
+    } while ((*path != ' ') && (*path != 0x00));
+
 
     return 0;
 }
 
-int open_dir(struct fatfs *fs, struct fatfs_dir *dj, char *path)
+int fat_open(struct fatfs *fs, struct fatfs_dir *dj, char *path)
 {
     if (!fs || !dj || !path)
         return -1;
@@ -295,20 +348,45 @@ int open_dir(struct fatfs *fs, struct fatfs_dir *dj, char *path)
     if (ret)
         return ret;
 
+    dj->off = 0;
 
+    return 0;
 }
 
-int read_dir(struct fatfs *fs, struct fatfs_dir *dj)
+int fat_readdir(struct fatfs *fs, struct fatfs_dir *dj)
 {
     if (!fs || !dj)
         return -1;
-
 
     int res = dir_read(fs, dj);
     if (res)
         return -1;
 
-    //printf("found dir named %s\n", dj->fn);
-
     return 0;
+}
+
+int fat_read(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len)
+{
+    if (!fs || !dj)
+        return -1;
+
+    int r_len = 0, sect = 0, off;
+
+    while (r_len < len) {
+        mb_read(fs->fd, fs->win, 0, ((dj->sect + sect) * fs->bps), fs->bps);
+        print_array(fs->win, fs->bps);
+
+        for (off = 0; r_len < dj->fsize && r_len < len && off < fs->bps; r_len++) {
+            memcpy(buf++, (fs->win + off++), 1);
+        }
+        off = 0;
+        sect++;
+        if ((sect + 1) > fs->spc) {
+            dj->cclust = get_fat(fs, dj->cclust);
+            dj->sect = clust2sect(fs, dj->cclust);
+            sect = 0;
+        }
+    }
+
+    return r_len;
 }

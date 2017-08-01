@@ -39,15 +39,13 @@ int main(int argc, char **argv)
 
     mount(fs);
 
-    uint32_t fat = get_fat(fs, 2);
-    printf("FAT 2: 0x%08X\n", fat);
-    fat = get_fat(fs, 0x0b);
-    printf("FAT 0x0b: 0x%08X\n", fat);
-    uint32_t next = walk_fat(fs);
-    fat = get_fat(fs, next);
-    printf("FAT 0x%08X: 0x%08X\n", (fs->fatbase * fs->bps) + (next * 4), fat);
-
     ls(fs, "/");
+    cat(fs, "/FOO");
+
+    ls(fs, "/BARDIR");
+    cat(fs, "/BARDIR/BAR");
+
+    cat(fs, "LONGLO~1");
 
     // if you're happy and you know it,
     exit(0);

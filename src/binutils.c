@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include "fat.h"
 
 int ls(struct fatfs *fs, char *path)
@@ -28,17 +29,48 @@ int ls(struct fatfs *fs, char *path)
     if (!fs || !path)
         return -1;
 
-    printf("trying to read directory %s\n", path);
+    printf("Reading directory: %s\n", path);
 
     struct fatfs_dir dj;
     char fname[12];
     dj.fn = fname;
 
+    fat_open(fs, &dj, path);
+    printf("Opened directory at: 0x%08X\n", dj.sect * 512);
 
-    open_dir(fs, &dj, path);
-    printf("trying to read directory at 0x%08X\n", dj.sect * 512);
+    while (!fat_readdir(fs, &dj)) {
+        printf("%s\n", dj.fn);
+    }
 
-    read_dir(fs, &dj);
+    return 0;
+}
+
+int cat(struct fatfs *fs, char *path)
+{
+    if (!fs || !path)
+        return -1;
+
+    printf("Reading file: %s\n", path);
+
+    struct fatfs_dir dj;
+    char fname[12];
+    dj.fn = fname;
+
+    int res = fat_open(fs, &dj, path);
+
+    printf("Found file %s with %d bytes length\n", dj.fn, dj.fsize);
+
+    uint8_t *buf = malloc((dj.fsize + 1) * sizeof (uint8_t));
+    memset(buf, 0, (dj.fsize + 1));
+    res = fat_read(fs, &dj, buf, dj.fsize);
+
+    printf("Buffer %d bytes:\n", res);
+
+    while (2 > 1) {
+        if (!*buf)
+            break;
+        putchar(*buf++);
+    }
 
     return 0;
 }
