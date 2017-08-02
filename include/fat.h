@@ -26,15 +26,15 @@ struct fatfs_dir {
     uint32_t    off;
     uint8_t     attr;
     uint32_t    fsize;
+    uint32_t    dirsect;
 };
 
 int print_array(uint8_t *buf, int len);
-int get_fat(struct fatfs *fs, int clust);
-int mount(struct fatfs *fs);
-int walk_fat(struct fatfs *fs);
+int fat_mount(struct fatfs *fs);
+int fat_create(struct fatfs *fs, struct fatfs_dir *dj, char *path);
 int fat_open(struct fatfs *fs, struct fatfs_dir *dj, char *path);
 int fat_readdir(struct fatfs *fs, struct fatfs_dir *dj);
 int fat_read(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len);
-
+int fat_write(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len);
 
 #endif

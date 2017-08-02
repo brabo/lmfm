@@ -56,6 +56,30 @@ int mb_read(int fd, void *_buf, uint32_t lba, int offset, int count)
     return len;
 }
 
+int mb_write(int fd, void *_buf, uint32_t lba, int offset, int count)
+{
+    off_t off;
+    int len;
+
+    off = lseek(fd, (off_t)offset, SEEK_SET);
+    if (off < 0) {
+        perror("mb_write: lseek: ");
+        return -1;
+    }
+
+    if (off != offset) {
+        return -2;
+    }
+
+    len = write(fd, _buf, count);
+    if (len < 0) {
+        perror("mb_write: write: ");
+        return -3;
+    }
+
+    return len;
+}
+
 int mb_init(char *mb_name)
 {
     int fd;
@@ -70,4 +94,11 @@ int mb_init(char *mb_name)
     }
 
     return fd;
+}
+
+int mb_close(int fd)
+{
+    close(fd);
+
+    return 0;
 }

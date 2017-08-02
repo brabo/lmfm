@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include "fat.h"
 #include "mockblock.h"
 #include "binutils.h"
@@ -40,13 +41,25 @@ int main(int argc, char **argv)
     mount(fs);
 
     ls(fs, "/");
-    cat(fs, "/FOO");
 
-    ls(fs, "/BARDIR");
-    cat(fs, "/BARDIR/BAR");
+    /* uncomment next two lines to make a file with content */
+    //char *buf = "GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
+    //mk_file(fs, "/GGRR", buf, strlen(buf));
 
-    cat(fs, "LONGLO~1");
+    ls(fs, "/");
 
+    /* these would have to exist, but can be created by mk_file above */
+    cat(fs, "/ERR");
+    cat(fs, "/GRR");
+    cat(fs, "/FRR");
+    cat(fs, "/ZRR");
+    cat(fs, "/AARR");
+    cat(fs, "/BBRR");
+    cat(fs, "/GGRR");
+
+    mb_close(fs->fd);
+
+    free(fs);
     // if you're happy and you know it,
     exit(0);
 }
