@@ -280,6 +280,7 @@ static int dir_find(struct fatfs *fs, struct fatfs_dir *dj, char *path)
             uint32_t fat = get_fat(fs, dj->sclust);
             dj->sect = clust2sect(fs, dj->sclust);
             dj->cclust = dj->sclust;
+            dj->foff = 0;
             return 0;
         }
     }
@@ -441,6 +442,8 @@ int fat_create(struct fatfs *fs, struct fatfs_dir *dj, char *path)
     mb_write(fs->fd, fs->win, 0, dj->sect * fs->bps, fs->bps);
     dj->sclust = dj->cclust = clust;
     dj->sect = clust2sect(fs, dj->cclust);
+    dj->foff = 0;
+    dj->fsize = 0;
 
     return ret;
 }
@@ -479,12 +482,35 @@ int fat_read(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len)
     if (!fs || !dj)
         return -1;
 
-    int r_len = 0, sect = 0, off;
+    int r_len = 0, sect = 0, off = 0, clust = 0, tmpclust = 0;
+    //printf("0x%08X\n", dj->sect * fs->bps);
+
+    /* calculate where to put sect and off! */
+    off = dj->foff;
+    while (off >= fs->bps) {
+        sect++;
+        off -= fs->bps;
+    }
+
+    while (sect >= fs->spc) {
+        clust++;
+        sect -= fs->spc;
+    }
+
+    tmpclust = dj->sclust;
+    while(clust > 0) {
+        /* walk cluster chain until we have right cluster! */
+        tmpclust = get_fat(fs, tmpclust);
+        clust--;
+    }
+
+    dj->cclust = tmpclust;
+    dj->sect = clust2sect(fs, dj->cclust);
 
     while (r_len < len) {
         mb_read(fs->fd, fs->win, 0, ((dj->sect + sect) * fs->bps), fs->bps);
 
-        for (off = 0; r_len < dj->fsize && r_len < len && off < fs->bps; r_len++) {
+        for (; r_len < dj->fsize && r_len < len && off < fs->bps; r_len++) {
             memcpy(buf++, (fs->win + off++), 1);
         }
         off = 0;
@@ -504,18 +530,41 @@ int fat_write(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len)
     if (!fs || !dj)
         return -1;
 
-    int w_len = 0, sect = 0, off;
+    int w_len = 0, sect = 0, off = 0, clust = 0, tmpclust = 0;
+
+    /* calculate where to put sect and off! */
+    off = dj->foff;
+    while (off >= fs->bps) {
+        sect++;
+        off -= fs->bps;
+    }
+
+    while (sect >= fs->spc) {
+        clust++;
+        sect -= fs->spc;
+    }
+
+    tmpclust = dj->sclust;
+    while(clust > 0) {
+        /* walk cluster chain until we have right cluster! */
+        tmpclust = get_fat(fs, tmpclust);
+        clust--;
+    }
+
+    dj->cclust = tmpclust;
+    dj->sect = clust2sect(fs, dj->cclust);
 
     while (w_len < len) {
         mb_read(fs->fd, fs->win, 0, ((dj->sect + sect) * fs->bps), fs->bps);
         //print_array(fs->win, fs->bps);
 
-        for (off = 0; w_len < len && off < fs->bps; w_len++) {
+        for (; w_len < len && off < fs->bps; w_len++) {
             memcpy((fs->win + off++), (buf++), 1);
         }
         //print_array(fs->win, fs->bps);
         mb_write(fs->fd, fs->win, 0, ((dj->sect + sect) * fs->bps), fs->bps);
         sect++;
+        off = 0;
         if ((sect + 1) > fs->spc) {
             uint32_t tempclus = dj->cclust;
             dj->cclust = init_fat(fs);
@@ -525,17 +574,26 @@ int fat_write(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len)
         }
     }
 
-    mb_read(fs->fd, fs->win, 0, (dj->dirsect * fs->bps), fs->bps);
-    //print_array(fs->win, fs->bps);
-    st_dword((fs->win + dj->off + DIR_FSIZE), (uint32_t)w_len);
-    //print_array(fs->win, fs->bps);
-    mb_write(fs->fd, fs->win, 0, (dj->dirsect * fs->bps), fs->bps);
+    dj->foff += w_len;
+    if (dj->foff > dj->fsize) {
+        dj->fsize = dj->foff;
+        mb_read(fs->fd, fs->win, 0, (dj->dirsect * fs->bps), fs->bps);
+        //print_array(fs->win, fs->bps);
+        st_dword((fs->win + dj->off + DIR_FSIZE), (uint32_t)dj->fsize);
+        //print_array(fs->win, fs->bps);
+        mb_write(fs->fd, fs->win, 0, (dj->dirsect * fs->bps), fs->bps);
+    }
 
     return w_len;
 }
 
-int fat_lseek(struct fatfs *fs, struct fatfs_dir *dj, int offset)
+int fat_lseek(struct fatfs *fs, struct fatfs_dir *dj, uint32_t offset)
 {
+    if (!fs || !dj)
+        return -1;
+
+    dj->foff = offset;
+
     return 0;
 }
 

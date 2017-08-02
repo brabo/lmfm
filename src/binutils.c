@@ -116,3 +116,30 @@ int mk_file(struct fatfs *fs, char *path, uint8_t *buf, int len)
 
     return res;
 }
+
+int edit_file(struct fatfs *fs, char *path)
+{
+    if (!fs || !path)
+        return -1;
+
+    printf("C:\\VI %s\n", path);
+
+    struct fatfs_dir dj;
+    char fname[12];
+    dj.fn = fname;
+
+    int res = fat_open(fs, &dj, path);
+    if (res)
+        return res;
+
+    uint8_t buf[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+    uint8_t buf2[4] = { 0x42, 0x42, 0x42, 0x42 };
+
+    res = fat_lseek(fs, &dj, (5096 + 256));
+    res = fat_write(fs, &dj, buf, 4);
+    res = fat_lseek(fs, &dj, (5096 + 256));
+    res = fat_read(fs, &dj, buf2, 4);
+    printf("Found 0x%02X%02X%02X%02X\n", buf2[0], buf2[1], buf2[2], buf2[3]);
+
+    return res;
+}

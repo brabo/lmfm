@@ -6,5 +6,6 @@ int ls(struct fatfs *fs, char *path);
 int cat(struct fatfs *fs, char *path);
 int touch(struct fatfs *fs, char *path);
 int mk_file(struct fatfs *fs, char *path, uint8_t *buf, int len);
+int edit_file(struct fatfs *fs, char *path);
 
 #endif

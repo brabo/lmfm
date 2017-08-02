@@ -51,14 +51,17 @@ int main(int argc, char **argv)
     ls(fs, "/");
 
     /* these would have to exist, but can be created by mk_file above */
-    cat(fs, "/ERR");
+    //cat(fs, "/ERR");
     cat(fs, "/GRR");
-    cat(fs, "/FRR");
-    cat(fs, "/ZRR");
-    cat(fs, "/AARR");
-    cat(fs, "/BBRR");
-    cat(fs, "/GGRR");
-    cat(fs, "/ZZRR");
+    //cat(fs, "/FRR");
+    //cat(fs, "/ZRR");
+    //cat(fs, "/AARR");
+    //cat(fs, "/BBRR");
+    //cat(fs, "/GGRR");
+    //cat(fs, "/ZZRR");
+
+    edit_file(fs, "/GRR");
+    cat(fs, "/GRR");
 
     mb_close(fs->fd);
 
