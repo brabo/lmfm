@@ -44,7 +44,9 @@ int main(int argc, char **argv)
 
     /* uncomment next two lines to make a file with content */
     //char *buf = "GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
-    //mk_file(fs, "/GGRR", buf, strlen(buf));
+    //uint8_t *buf = malloc(10240 * sizeof (uint8_t));
+    //memset(buf, 'Z', 10240);
+    //mk_file(fs, "/GRR", buf, 10240);
 
     ls(fs, "/");
 
@@ -56,6 +58,7 @@ int main(int argc, char **argv)
     cat(fs, "/AARR");
     cat(fs, "/BBRR");
     cat(fs, "/GGRR");
+    cat(fs, "/ZZRR");
 
     mb_close(fs->fd);
 

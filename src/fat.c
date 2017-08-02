@@ -137,6 +137,28 @@ static int get_fat(struct fatfs *fs, int clust)
     return -2;
 }
 
+static int set_fat(struct fatfs *fs, uint32_t clust, uint32_t val)
+{
+    if (clust < 2 || clust >= fs->n_fatent) { /* Range check */
+        return -1;
+    }
+
+    switch(fs->type) {
+    case FAT12:
+        break;
+    case FAT16:
+        //if (mb_read(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 2))) * fs->bps, fs->bps)) break;
+        //return LD_WORD(fs->win + (clust * 2));
+        break;
+    case FAT32:
+        if (!mb_read(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 4))) * fs->bps, fs->bps)) break;
+        st_dword((fs->win + ((clust * 4) % fs->bps)), (uint32_t)(val & 0x0FFFFFFF));
+        mb_write(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 4))) * fs->bps, fs->bps);
+        return 0;
+    }
+    return -2;
+}
+
 static int clust2sect(struct fatfs *fs, uint32_t clust)
 {
     clust -= 2;
@@ -495,7 +517,9 @@ int fat_write(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len)
         mb_write(fs->fd, fs->win, 0, ((dj->sect + sect) * fs->bps), fs->bps);
         sect++;
         if ((sect + 1) > fs->spc) {
+            uint32_t tempclus = dj->cclust;
             dj->cclust = init_fat(fs);
+            set_fat(fs, tempclus, dj->cclust);
             dj->sect = clust2sect(fs, dj->cclust);
             sect = 0;
         }
