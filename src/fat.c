@@ -40,15 +40,16 @@
 #define BS_FSTYPE       54
 #define BS_FSTYPE32     82
 #define BS_MBR          446
+#define BS_BS           454
 #define BS_55AA         510
+
+#define DEFBPS          512
 
 #define DIR_NAME        0
 #define DIR_ATTR        11
 #define DIR_SCLUST_HI   20
 #define DIR_SCLUST_LO   26
 #define DIR_FSIZE       28
-
-
 
 #define FAT12   1
 #define FAT16   2
@@ -60,17 +61,25 @@
 //#define ST_WORD(ptr, val)       (*((uint16_t *)ptr) = val)
 //#define ST_DWORD(ptr, val)      (*((uint32_t *)ptr) = val)
 
+/* Macro proxies for disk operations */
+#define disk_read(f,b,s,o,l) mb_read(f,b,s,o,l)
+#define disk_write(f,b,s,o,l) mb_write(f,b,s,o,l)
+
 static void st_word(uint8_t *ptr, uint16_t val)  /* Store a 2-byte word in little-endian */
 {
-    *ptr++ = (uint8_t)val; val >>= 8;
+    *ptr++ = (uint8_t)val;
+    val >>= 8;
     *ptr++ = (uint8_t)val;
 }
 
 static void st_dword(uint8_t *ptr, uint32_t val)    /* Store a 4-byte word in little-endian */
 {
-    *ptr++ = (uint8_t)val; val >>= 8;
-    *ptr++ = (uint8_t)val; val >>= 8;
-    *ptr++ = (uint8_t)val; val >>= 8;
+    *ptr++ = (uint8_t)val;
+    val >>= 8;
+    *ptr++ = (uint8_t)val;
+    val >>= 8;
+    *ptr++ = (uint8_t)val;
+    val >>= 8;
     *ptr++ = (uint8_t)val;
 }
 
@@ -127,10 +136,10 @@ static int get_fat(struct fatfs *fs, int clust)
     case FAT12:
         break;
     case FAT16:
-        if (mb_read(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 2))) * fs->bps, fs->bps)) break;
+        if (mb_read(fs->fd, fs->win, (fs->fatbase + (clust / (fs->bps / 2))), 0, fs->bps)) break;
         return LD_WORD(fs->win + (clust * 2));
     case FAT32:
-        if (!mb_read(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 4))) * fs->bps, fs->bps)) break;
+        if (mb_read(fs->fd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps) < 0) break;
 
         return (LD_DWORD(fs->win + ((clust * 4) % fs->bps)) & 0x0FFFFFFF);
     }
@@ -151,9 +160,9 @@ static int set_fat(struct fatfs *fs, uint32_t clust, uint32_t val)
         //return LD_WORD(fs->win + (clust * 2));
         break;
     case FAT32:
-        if (!mb_read(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 4))) * fs->bps, fs->bps)) break;
+        if (mb_read(fs->fd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps) < 0) break;
         st_dword((fs->win + ((clust * 4) % fs->bps)), (uint32_t)(val & 0x0FFFFFFF));
-        mb_write(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 4))) * fs->bps, fs->bps);
+        mb_write(fs->fd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps);
         return 0;
     }
     return -2;
@@ -178,7 +187,7 @@ static int get_clust(struct fatfs *fs, uint8_t* dir)
     return clst;
 }
 
-static int set_clust(struct fatfs *fs, uint8_t* dir, uint32_t clust)
+static int set_clust(struct fatfs *fs, uint8_t *dir, uint32_t clust)
 {
     if (fs->type == FAT32) {
         st_word((dir + DIR_SCLUST_HI), (clust >> 16));
@@ -212,7 +221,7 @@ static int init_fat(struct fatfs *fs)
 {
     int clust = walk_fat(fs);
     st_dword((fs->win + ((clust * 4) % fs->bps)), 0x0FFFFFFF);
-    mb_write(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 4))) * fs->bps, fs->bps);
+    mb_write(fs->fd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps);
     return clust;
 }
 
@@ -239,7 +248,7 @@ static int dir_read(struct fatfs *fs, struct fatfs_dir *dj)
         dj->sect++;
         dj->off = 0;
     }
-    mb_read(fs->fd, fs->win, 0, (dj->sect * fs->bps), fs->bps);
+    mb_read(fs->fd, fs->win, dj->sect, 0, fs->bps);
     //print_array(fs->win, fs->bps);
 
     /* have to check cluster borders! */
@@ -252,11 +261,23 @@ static int dir_read(struct fatfs *fs, struct fatfs_dir *dj)
             continue;
         } else {
             int i;
+            char *p = dj->fn;
+            memset(dj->fn, 0x00, 13);
+            char c;
             for (i = 0; i < 8; i++) {   /* Copy file name body */
-                dj->fn[i] = off[i];
-                if (dj->fn[i] == ' ') break;
+                c = off[i];
+                if (c == ' ') break;
+                if (c == 0x05) c = 0xE5;
+                *p++ = c;
             }
-            dj->fn[i] = 0x00;
+            if (off[8] != ' ') {        /* Copy file name extension */
+                *p++ = '.';
+                for (i = 8; i < 11; i++) {
+                    c = off[i];
+                    if (c == ' ') break;
+                    *p++ = c;
+                }
+            }
             dj->attr = *(off + DIR_ATTR);
             dj->sclust = get_clust(fs, off);
             dj->fsize = LD_DWORD(off + DIR_FSIZE);
@@ -275,7 +296,7 @@ static int dir_find(struct fatfs *fs, struct fatfs_dir *dj, char *path)
         return -1;
 
     while (dir_read(fs, dj) == 0) {
-        if (!strncmp(dj->fn, path, 11)) {
+        if (!strncmp(dj->fn, path, 12)) {
             dj->off -= 32;
             uint32_t fat = get_fat(fs, dj->sclust);
             dj->sect = clust2sect(fs, dj->sclust);
@@ -302,6 +323,7 @@ static int follow_path(struct fatfs *fs, struct fatfs_dir *dj, char *path)
 
     res = dir_rewind(fs, dj);
     if (*path < ' ') {
+        dj->off = 0;
         return res;
     }
 
@@ -328,7 +350,7 @@ static int follow_path(struct fatfs *fs, struct fatfs_dir *dj, char *path)
 static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
 {
     int nlen = strlen(name);
-    if (nlen > 11)
+    if (nlen > 12)
         return -1;
 
     memset((fs->win + dj->off), 0, 0x20);
@@ -347,12 +369,12 @@ static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
 
 int fat_mount(struct fatfs *fs)
 {
-    mb_read(fs->fd, fs->win, 0, (fs->bsect * 512), 512);
+    mb_read(fs->fd, fs->win, fs->bsect, 0, DEFBPS);
     //print_array(fs->win, 512);
 
     if (check_fs(fs) == -2) {
-        fs->bsect = LD_WORD(fs->win + BS_MBR + 8);
-        mb_read(fs->fd, fs->win, 0, (fs->bsect * 512), 512);
+        fs->bsect = LD_WORD(fs->win + BS_BS);
+        mb_read(fs->fd, fs->win, fs->bsect, 0, DEFBPS);
         //print_array(fs->win, 512);
         if (check_fs(fs) < 0) {
             printf("Cannot find any valid boot sector, quitting..\n");
@@ -439,7 +461,7 @@ int fat_create(struct fatfs *fs, struct fatfs_dir *dj, char *path)
 
     ret = add_dir(fs, dj, path);
     set_clust(fs, (fs->win + dj->off), clust);
-    mb_write(fs->fd, fs->win, 0, dj->sect * fs->bps, fs->bps);
+    mb_write(fs->fd, fs->win, dj->sect, 0, fs->bps);
     dj->sclust = dj->cclust = clust;
     dj->sect = clust2sect(fs, dj->cclust);
     dj->foff = 0;
@@ -507,19 +529,32 @@ int fat_read(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len)
     dj->cclust = tmpclust;
     dj->sect = clust2sect(fs, dj->cclust);
 
-    while (r_len < len) {
-        mb_read(fs->fd, fs->win, 0, ((dj->sect + sect) * fs->bps), fs->bps);
+    while ((r_len < len) && (dj->foff < dj->fsize)) {
+        int r = len - r_len;
+        if (r > 512)
+            r = 512;
 
-        for (; r_len < dj->fsize && r_len < len && off < fs->bps; r_len++) {
-            memcpy(buf++, (fs->win + off++), 1);
+        if ((r == 512) && off > 0)
+            r -= off;
+
+        if (dj->foff + r > dj->fsize)
+                r = dj->fsize - dj->foff;
+
+        mb_read(fs->fd, (buf + r_len), (dj->sect + sect), off, r);
+
+        r_len += r;
+        dj->foff += r;
+        off += r;
+
+        if ((r_len < len) && (off == fs->bps) && (dj->foff < dj->fsize)) {
+            sect++;
+            if ((sect + 1) > fs->spc) {
+                dj->cclust = get_fat(fs, dj->cclust);
+                dj->sect = clust2sect(fs, dj->cclust);
+                sect = 0;
+            }
         }
         off = 0;
-        sect++;
-        if ((sect + 1) > fs->spc) {
-            dj->cclust = get_fat(fs, dj->cclust);
-            dj->sect = clust2sect(fs, dj->cclust);
-            sect = 0;
-        }
     }
 
     return r_len;
@@ -555,14 +590,14 @@ int fat_write(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len)
     dj->sect = clust2sect(fs, dj->cclust);
 
     while (w_len < len) {
-        mb_read(fs->fd, fs->win, 0, ((dj->sect + sect) * fs->bps), fs->bps);
+        mb_read(fs->fd, fs->win, (dj->sect + sect), 0, fs->bps);
         //print_array(fs->win, fs->bps);
 
         for (; w_len < len && off < fs->bps; w_len++) {
             memcpy((fs->win + off++), (buf++), 1);
         }
         //print_array(fs->win, fs->bps);
-        mb_write(fs->fd, fs->win, 0, ((dj->sect + sect) * fs->bps), fs->bps);
+        mb_write(fs->fd, fs->win, (dj->sect + sect), 0, fs->bps);
         sect++;
         off = 0;
         if ((sect + 1) > fs->spc) {
@@ -577,11 +612,11 @@ int fat_write(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len)
     dj->foff += w_len;
     if (dj->foff > dj->fsize) {
         dj->fsize = dj->foff;
-        mb_read(fs->fd, fs->win, 0, (dj->dirsect * fs->bps), fs->bps);
+        mb_read(fs->fd, fs->win, dj->dirsect, 0, fs->bps);
         //print_array(fs->win, fs->bps);
         st_dword((fs->win + dj->off + DIR_FSIZE), (uint32_t)dj->fsize);
         //print_array(fs->win, fs->bps);
-        mb_write(fs->fd, fs->win, 0, (dj->dirsect * fs->bps), fs->bps);
+        mb_write(fs->fd, fs->win, dj->dirsect, 0, fs->bps);
     }
 
     return w_len;

@@ -41,8 +41,9 @@ int ls(struct fatfs *fs, char *path)
     printf("C:\\LS %s\n", path);
 
     struct fatfs_dir dj;
-    char fname[12];
+    char fname[13];
     dj.fn = fname;
+    memset(fname, 0x00, 13);
 
     fat_open(fs, &dj, path);
 
@@ -62,7 +63,8 @@ int cat(struct fatfs *fs, char *path)
     printf("C:\\CAT %s\n", path);
 
     struct fatfs_dir dj;
-    char fname[12];
+    char fname[13];
+    memset(fname, 0x00, 13);
     dj.fn = fname;
 
     int res = fat_open(fs, &dj, path);
@@ -89,7 +91,8 @@ int touch(struct fatfs *fs, char *path)
     printf("C:\\TOUCH %s\n", path);
 
     struct fatfs_dir dj;
-    char fname[12];
+    char fname[13];
+    memset(fname, 0x00, 13);
     dj.fn = fname;
 
     int res = fat_open(fs, &dj, path);
@@ -105,7 +108,8 @@ int mk_file(struct fatfs *fs, char *path, uint8_t *buf, int len)
     printf("C:\\CP MEM %s\n", path);
 
     struct fatfs_dir dj;
-    char fname[12];
+    char fname[13];
+    memset(fname, 0x00, 13);
     dj.fn = fname;
 
     int res = fat_open(fs, &dj, path);
@@ -125,7 +129,8 @@ int edit_file(struct fatfs *fs, char *path)
     printf("C:\\VI %s\n", path);
 
     struct fatfs_dir dj;
-    char fname[12];
+    char fname[13];
+    memset(fname, 0x00, 13);
     dj.fn = fname;
 
     int res = fat_open(fs, &dj, path);

@@ -60,8 +60,8 @@ int main(int argc, char **argv)
     //cat(fs, "/GGRR");
     //cat(fs, "/ZZRR");
 
-    edit_file(fs, "/GRR");
-    cat(fs, "/GRR");
+    //edit_file(fs, "/GRR");
+    //cat(fs, "/GRR");
 
     mb_close(fs->fd);
 

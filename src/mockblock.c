@@ -37,14 +37,18 @@ int mb_read(int fd, void *_buf, uint32_t lba, int offset, int count)
     off_t off;
     int len;
 
-    off = lseek(fd, (off_t)offset, SEEK_SET);
+    off = lseek(fd, (off_t)((lba * 512) + offset), SEEK_SET);
     if (off < 0) {
         perror("mb_read: lseek: ");
         return -1;
     }
 
-    if (off != offset) {
+    if (off != ((lba * 512) + offset)) {
         return -2;
+    }
+
+    if (count + offset > 512) {
+        count = 512 - offset;
     }
 
     len = read(fd, _buf, count);
@@ -61,14 +65,18 @@ int mb_write(int fd, void *_buf, uint32_t lba, int offset, int count)
     off_t off;
     int len;
 
-    off = lseek(fd, (off_t)offset, SEEK_SET);
+    off = lseek(fd, (off_t)((lba * 512) + offset), SEEK_SET);
     if (off < 0) {
         perror("mb_write: lseek: ");
         return -1;
     }
 
-    if (off != offset) {
+    if (off != ((lba * 512) + offset)) {
         return -2;
+    }
+
+    if (count + offset > 512) {
+        count = 512 - offset;
     }
 
     len = write(fd, _buf, count);
