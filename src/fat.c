@@ -440,7 +440,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
                         //printf("trying path: %s\n", path);
                         //printf("dj.fn: %s\n", dj.fn);
                         if (strncmp(dj.fn, ".", 2) && strncmp(dj.fn, "..", 3))
-                            fatfs_populate(f, path, get_clust(f, (f->fs->win + (dj.off - 32))));
+                            fatfs_populate(f, path, get_clust(f->fs, (f->fs->win + (dj.off - 32))));
                     }
                 }
             } else {
