@@ -82,7 +82,7 @@ int cat(struct fatfs *fs, char *path)
             break;
         putchar(*buf++);
     }
-    printf("\n");
+    printf("\n\n");
 
     return 0;
 }
@@ -157,7 +157,7 @@ int edit_file(struct fatfs *fs, char *path)
 int vfs_ls(char *path)
 {
     char *fname;
-    char *fname_start;
+    char *fpath;
     struct dirent *ep, *result;
     DIR *d;
     struct stat st;
@@ -166,33 +166,27 @@ int vfs_ls(char *path)
     char ch_size[8] = "";
     char mag[] = " KMGT";
 
-    fname_start = malloc(MAX_FILE);
+    fname = malloc(MAX_FILE);
+    fpath = malloc(MAX_FILE);
     ep = malloc(sizeof(struct dirent));
-    if (!ep || !fname_start)
+    if (!ep || !fname || !fpath)
         return -1;
 
-    //getcwd(fname_start, MAX_FILE);
-    strncpy(fname_start, path, (strlen(path) + 1));
-
-    d = vfs_opendir(fname_start);
+    d = vfs_opendir(path);
     if (!d) {
-        fprintf(stderr, "Error opening %s\r\n", fname_start);
+        fprintf(stderr, "Error opening %s\r\n", path);
         return -2;
     }
+    printf("C:\\LS %s\n", path);
     while(vfs_readdir(d, ep, &result) == 0) {
-        fname = fname_start;
+
         fname[0] = '\0';
-        strncat(fname, fname_start, MAX_FILE);
-        strncat(fname, "/", MAX_FILE);
         strncat(fname, ep->d_name, MAX_FILE);
+        fpath[0] = '\0';
+        strncat(fpath, path, MAX_FILE);
+        strncat(fpath, fname, MAX_FILE);
 
-        while (fname[0] == '/')
-            fname++;
-
-        if (vfs_stat(fname, &st) == 0) {
-            if ((!strncmp(fname, ".", 1) || !strncmp(fname, "..", 2)) ) {
-                continue;
-            }
+        if (vfs_stat(fpath, &st) == 0) {
             printf(fname);
                 printf( "\t");
                 if (S_ISDIR(st.st_mode)) {
@@ -221,9 +215,11 @@ int vfs_ls(char *path)
             fprintf(stderr, "stat error on %s: %s.\r\n", fname, strerror(errno));
         }
     }
+    printf("\n");
     vfs_closedir(d);
     free(ep);
-    free(fname_start);
+    free(fname);
+    free(fpath);
 
     return 0;
 }
