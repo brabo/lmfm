@@ -180,7 +180,7 @@ int vfs_ls(char *path)
     if (!ep || !fname || !fpath)
         return -1;
 
-    d = vfs_opendir(path);
+    d = (DIR *)vfs_opendir(path);
     if (!d) {
         fprintf(stderr, "Error opening %s\r\n", path);
         return -2;

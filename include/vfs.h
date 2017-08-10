@@ -64,10 +64,14 @@ struct mountpoint
 struct fnode *fno_search(const char *_path);
 struct fnode *fno_create(struct module *owner, const char *name, struct fnode *parent);
 struct fnode *fno_mkdir(struct module *owner, const char *name, struct fnode *parent);
-int vfs_opendir(uint32_t arg1);
-int vfs_readdir(uint32_t arg1, uint32_t arg2, uint32_t arg3);
-int vfs_closedir(uint32_t arg1);
+int fno_fullpath(struct fnode *f, char *dst, int len);
+void fno_unlink(struct fnode *fno);
+
+struct fnode * vfs_opendir(void *arg1);
+int vfs_readdir(void * arg1, void * arg2, void * arg3);
+int vfs_closedir(void * arg1);
 int vfs_stat(char *path, struct stat *st);
 void vfs_init(void);
+int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *args);
 
 #endif

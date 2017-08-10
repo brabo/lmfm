@@ -407,23 +407,23 @@ struct fnode *fno_mkdir(struct module *owner, const char *name, struct fnode *pa
     return fno;
 }
 
-int vfs_opendir(uint32_t arg1)
+struct fnode * vfs_opendir(void *arg1)
 {
     struct fnode *fno;
     fno = fno_search((char *)arg1);
     if (fno && (fno->flags & FL_DIR)) {
         if (fno->flags & FL_INUSE)
-            return (int)NULL; /* XXX EBUSY */
+            return NULL; /* XXX EBUSY */
         /* Use .off to store current readdir ptr */
         fno->off = (int)fno->children;
         fno->flags |= FL_INUSE;
-        return (int)fno;
+        return fno;
     } else {
-        return (int)NULL;
+        return NULL;
     }
 }
 
-int vfs_readdir(uint32_t arg1, uint32_t arg2, uint32_t arg3)
+int vfs_readdir(void *arg1, void * arg2, void * arg3)
 {
     struct fnode *fno;
     struct fnode *next;
@@ -447,7 +447,7 @@ int vfs_readdir(uint32_t arg1, uint32_t arg2, uint32_t arg3)
     return 0;
 }
 
-int vfs_closedir(uint32_t arg1)
+int vfs_closedir(void * arg1)
 {
     struct fnode *fno = (struct fnode *)arg1;
     fno->off = 0;
