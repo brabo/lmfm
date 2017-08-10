@@ -22,7 +22,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <dirent.h>
 #include "fat.h"
+#include "vfs.h"
 
 int mount(struct fatfs *fs)
 {
@@ -147,4 +151,79 @@ int edit_file(struct fatfs *fs, char *path)
     printf("Found 0x%02X%02X%02X%02X\n", buf2[0], buf2[1], buf2[2], buf2[3]);
 
     return res;
+}
+
+
+int vfs_ls(char *path)
+{
+    char *fname;
+    char *fname_start;
+    struct dirent *ep, *result;
+    DIR *d;
+    struct stat st;
+    char type;
+    int i;
+    char ch_size[8] = "";
+    char mag[] = " KMGT";
+
+    fname_start = malloc(MAX_FILE);
+    ep = malloc(sizeof(struct dirent));
+    if (!ep || !fname_start)
+        return -1;
+
+    //getcwd(fname_start, MAX_FILE);
+    strncpy(fname_start, path, (strlen(path) + 1));
+
+    d = vfs_opendir(fname_start);
+    if (!d) {
+        fprintf(stderr, "Error opening %s\r\n", fname_start);
+        return -2;
+    }
+    while(vfs_readdir(d, ep, &result) == 0) {
+        fname = fname_start;
+        fname[0] = '\0';
+        strncat(fname, fname_start, MAX_FILE);
+        strncat(fname, "/", MAX_FILE);
+        strncat(fname, ep->d_name, MAX_FILE);
+
+        while (fname[0] == '/')
+            fname++;
+
+        if (vfs_stat(fname, &st) == 0) {
+            if ((!strncmp(fname, ".", 1) || !strncmp(fname, "..", 2)) ) {
+                continue;
+            }
+            printf(fname);
+                printf( "\t");
+                if (S_ISDIR(st.st_mode)) {
+                    type = 'd';
+                } else if (S_ISLNK(st.st_mode)) {
+                    type = 'l';
+                } else {
+                    unsigned long size = st.st_size;;
+                    int order = 0;
+                    char magn;
+                        while (size > 1000) {
+                            size /= 1000;
+                            order++;
+                        }
+                        magn = mag[order];
+
+                    snprintf(ch_size, 9, "%lu%c ", size, magn);
+                    type = 'f';
+                }
+
+                printf( "%c", type);
+                printf( "    ");
+                printf( ch_size);
+            printf( "\r\n");
+        } else {
+            fprintf(stderr, "stat error on %s: %s.\r\n", fname, strerror(errno));
+        }
+    }
+    vfs_closedir(d);
+    free(ep);
+    free(fname_start);
+
+    return 0;
 }

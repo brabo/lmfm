@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "fat.h"
+#include "vfs.h"
 #include "mockblock.h"
 #include "binutils.h"
 
@@ -66,6 +67,11 @@ int main(int argc, char **argv)
     mb_close(fs->fd);
 
     free(fs);
+
+    vfs_init();
+    vfs_ls("/");
+    vfs_ls("/mnt/");
+
     // if you're happy and you know it,
     exit(0);
 }
