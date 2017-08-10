@@ -253,5 +253,6 @@ void vfs_cat(char *path)
         putchar(*buf++);
     }
     printf("\n\n");
+    fatfs_close(fno);
 
 }

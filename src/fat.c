@@ -245,6 +245,8 @@ static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
 
 static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
 {
+    /* the dir_read logic needs refactoring.
+        for one it sucks we have to -= 32 the offset in populate */
     if (!fsd || !dj)
         return -1;
 
