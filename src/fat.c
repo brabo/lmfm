@@ -27,6 +27,34 @@
 #include "vfs.h"
 #include "mockblock.h"
 
+static int print_array(uint8_t *buf, int len)
+{
+    char *bugger = malloc(sizeof(uint8_t) * ((len * 2) + 3));
+    char *ptr = bugger;
+    uint8_t *ptr2 = buf;
+    sprintf(ptr++, "[");
+
+    for (int i = 0; i < len; i++) {
+        sprintf(ptr, "%02X", *ptr2++);
+        ptr += 2;
+    }
+
+    sprintf(ptr++, "]");
+    printf("Read sector: %s\n", bugger);
+
+    free(bugger);
+
+    return 0;
+}
+
+#define kalloc(s) malloc(s)
+#define kcalloc(n,s) calloc(n,s)
+#define kfree(p) free(p)
+
+/* Macro proxies for disk operations */
+#define disk_read(f,b,s,o,l) mb_read(f->blockdev,b,s,o,l)
+#define disk_write(f,b,s,o,l) mb_write(f->blockdev,b,s,o,l)
+
 #define BS_JMPBOOT      0
 #define BPB_BPS         11
 #define BPB_SPC         13
@@ -61,30 +89,6 @@
 
 #define LD_WORD(ptr)        (uint16_t)(*(uint16_t *)(ptr))
 #define LD_DWORD(ptr)       (uint32_t)(*(uint32_t *)(ptr))
-
-/* Macro proxies for disk operations */
-#define disk_read(f,b,s,o,l) mb_read(f->blockdev,b,s,o,l)
-#define disk_write(f,b,s,o,l) mb_write(f->blockdev,b,s,o,l)
-
-static int print_array(uint8_t *buf, int len)
-{
-    char *bugger = malloc(sizeof(uint8_t) * ((len * 2) + 3));
-    char *ptr = bugger;
-    uint8_t *ptr2 = buf;
-    sprintf(ptr++, "[");
-
-    for (int i = 0; i < len; i++) {
-        sprintf(ptr, "%02X", *ptr2++);
-        ptr += 2;
-    }
-
-    sprintf(ptr++, "]");
-    printf("Read sector: %s\n", bugger);
-
-    free(bugger);
-
-    return 0;
-}
 
 static void st_word(uint8_t *ptr, uint16_t val)  /* Store a 2-byte word in little-endian */
 {
@@ -397,7 +401,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
     }
 
     parent = fno_search(fpath);
-    parent->priv = (void *)malloc(sizeof(struct fatfs_priv));
+    parent->priv = (void *)kalloc(sizeof(struct fatfs_priv));
     ((struct fatfs_priv *)parent->priv)->fsd = f;
     dj.fn = fbuf;
 
@@ -424,7 +428,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
                 strcat(fullpath, "/");
                 strcat(fullpath, dj.fn);
                 if (newdir) {
-                    newdir->priv = (void *)malloc(sizeof(struct fatfs_priv));
+                    newdir->priv = (void *)kalloc(sizeof(struct fatfs_priv));
                     if (!newdir->priv) {
                         fno_unlink(newdir);
                     } else {
@@ -447,7 +451,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
                 struct fnode *newfile;
                 newfile = fno_create(NULL, dj.fn, parent);
                 if (newfile) {
-                    newfile->priv = (void *)malloc(sizeof(struct fatfs_priv));
+                    newfile->priv = (void *)kalloc(sizeof(struct fatfs_priv));
                     if (!newfile->priv) {
                         fno_unlink(newfile);
                     } else {
@@ -498,7 +502,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
 //    }
 
     /* Initialize file system to disk association */
-    fsd = calloc(sizeof(struct fatfs_disk), 1);
+    fsd = kcalloc(sizeof(struct fatfs_disk), 1);
     if (!fsd)
         return -1;
 
@@ -506,9 +510,9 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     fsd->blockdev = src_dev;
 
     /* Associate a newly created fat filesystem */
-    fsd->fs = calloc(sizeof(struct fatfs), 1);
+    fsd->fs = kcalloc(sizeof(struct fatfs), 1);
     if (!fsd->fs) {
-        free(fsd);
+        kfree(fsd);
         return -1;
     }
 
@@ -574,8 +578,8 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     return 0;
 
 fail:
-    free(fsd->fs);
-    free(fsd);
+    kfree(fsd->fs);
+    kfree(fsd);
     return -1;
 }
 
@@ -589,7 +593,7 @@ int fatfs_create(struct fnode *fno)
 
     struct fatfs_dir dj;
     char fbuf[12];
-    char *path = malloc(MAXPATHLEN * sizeof (char));
+    char *path = kalloc(MAXPATHLEN * sizeof (char));
 
     if (!fno || !fno->parent)
         return -1;
@@ -599,7 +603,7 @@ int fatfs_create(struct fnode *fno)
     struct fatfs_priv *priv = (struct fatfs_priv *)fno->priv;
 
     if (!priv) {
-        priv = (void *)malloc(sizeof (struct fatfs_priv));
+        priv = (void *)kalloc(sizeof (struct fatfs_priv));
         priv->fsd = ((struct fatfs_priv *)fno->parent->priv)->fsd;
     }
 
