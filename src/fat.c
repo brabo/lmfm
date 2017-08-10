@@ -298,65 +298,6 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
     return 0;
 }
 
-static int dir_find(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
-{
-    if (!fsd || !dj || !path)
-        return -1;
-
-    struct fatfs *fs = fsd->fs;
-
-    while (dir_read(fsd, dj) == 0) {
-        if (!strncmp(dj->fn, path, 11)) {
-            dj->off -= 32;
-            uint32_t fat = get_fat(fsd, dj->sclust);
-            dj->sect = clust2sect(fs, dj->sclust);
-            dj->cclust = dj->sclust;
-            dj->off = 0;
-            return 0;
-        }
-    }
-
-    return -2;
-}
-
-static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
-{
-    int res;
-
-    while (*path == ' ')
-        path++;
-
-    if (*path == '/')
-        path++;
-
-    dj->cclust = 0;
-
-    res = dir_rewind(fsd->fs, dj);
-    if (*path < ' ') {
-        dj->off = 0;
-        return res;
-    }
-
-    dj->off = 0;
-
-    do {
-        char tpath[12];
-        char *tpathp = tpath;
-
-        while ((*path != '/') && (*path != ' ') && (*path != 0x00)) {
-            *tpathp++ = *path++;
-
-        }
-        *tpathp = 0x00;
-        res = dir_find(fsd, dj, tpath);
-        if (*path == '/')
-            path++;
-    } while ((*path != ' ') && (*path != 0x00));
-
-
-    return res;
-}
-
 static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
 {
     int nlen = strlen(name);
@@ -405,55 +346,50 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
     ((struct fatfs_priv *)parent->priv)->fsd = f;
     dj.fn = fbuf;
 
-    if (clust > 0) {
-        dj.cclust = clust;
-        dj.sclust = clust;
-        res = 0;
-    } else {
-        res = follow_path(f, &dj, path);
-    }
+    dj.cclust = clust;
+    dj.sclust = clust;
 
-    if (res == 0) {
-        dir_rewind(f->fs, &dj);
-        while(dir_read(f, &dj) == 0) {
-            if (!strncmp(dj.fn, ".", 2) || !strncmp(dj.fn, "..", 3))
-                continue;
+    dj.off = 0;
 
-            struct fnode *newdir;
+    dir_rewind(f->fs, &dj);
+    while(dir_read(f, &dj) == 0) {
+       if (!strncmp(dj.fn, ".", 2) || !strncmp(dj.fn, "..", 3))
+            continue;
 
-            if (dj.attr & AM_DIR) {
-                newdir = fno_mkdir(NULL, dj.fn, parent);
-            } else {
-                newdir = fno_create(NULL, dj.fn, parent);
-            }
+        struct fnode *newdir;
 
-            if (!newdir)
-                continue;
+        if (dj.attr & AM_DIR) {
+            newdir = fno_mkdir(NULL, dj.fn, parent);
+        } else {
+            newdir = fno_create(NULL, dj.fn, parent);
+        }
 
-            newdir->priv = (void *)kalloc(sizeof(struct fatfs_priv));
-            if (!newdir->priv) {
-                fno_unlink(newdir);
-                continue;
-            }
+        if (!newdir)
+            continue;
 
-            ((struct fatfs_priv *)newdir->priv)->sclust = dj.sclust;
-            ((struct fatfs_priv *)newdir->priv)->cclust = dj.cclust;
-            ((struct fatfs_priv *)newdir->priv)->sect = dj.sect;
-            ((struct fatfs_priv *)newdir->priv)->fsd = f;
-            ((struct fatfs_priv *)newdir->priv)->off = dj.off - 32;
-            ((struct fatfs_priv *)newdir->priv)->dirsect = dj.dirsect;
+        newdir->priv = (void *)kalloc(sizeof(struct fatfs_priv));
+        if (!newdir->priv) {
+            fno_unlink(newdir);
+            continue;
+        }
 
-            newdir->size = dj.fsize;
-            newdir->off = 0;
+        ((struct fatfs_priv *)newdir->priv)->sclust = dj.sclust;
+        ((struct fatfs_priv *)newdir->priv)->cclust = dj.cclust;
+        ((struct fatfs_priv *)newdir->priv)->sect = dj.sect;
+        ((struct fatfs_priv *)newdir->priv)->fsd = f;
+        ((struct fatfs_priv *)newdir->priv)->off = dj.off - 32;
+        ((struct fatfs_priv *)newdir->priv)->dirsect = dj.dirsect;
 
-            if (dj.attr & AM_DIR) {
-                char fullpath[128];
-                strncpy(fullpath, fpath, 128);
-                strcat(fullpath, "/");
-                strcat(fullpath, dj.fn);
-                path = relative_path(f, fullpath);
-                fatfs_populate(f, path, get_clust(f->fs, (f->fs->win + (dj.off - 32))));
-            }
+        newdir->size = dj.fsize;
+        newdir->off = 0;
+
+        if (dj.attr & AM_DIR) {
+            char fullpath[128];
+            strncpy(fullpath, fpath, 128);
+            strcat(fullpath, "/");
+            strcat(fullpath, dj.fn);
+            path = relative_path(f, fullpath);
+            fatfs_populate(f, path, get_clust(f->fs, (f->fs->win + (dj.off - 32))));
         }
     }
 }
@@ -600,7 +536,7 @@ int fatfs_create(struct fnode *fno)
     dj.fn = fbuf;
     dj.off = 0;
 
-    int ret = follow_path(fsd, &dj, path);
+    int ret;// = follow_path(fsd, &dj, path);
 
     uint32_t clust = init_fat(fsd);
 
