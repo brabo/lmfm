@@ -50,8 +50,20 @@ struct fnode {
     uint32_t off;
     int32_t usage_count;
     struct fnode *next;
+    int fd;
 };
 
+struct mountpoint
+{
+    struct fnode *target;
+    struct mountpoint *next;
+};
+
+#include <sys/stat.h>
+
+struct fnode *fno_search(const char *_path);
+struct fnode *fno_create(struct module *owner, const char *name, struct fnode *parent);
+struct fnode *fno_mkdir(struct module *owner, const char *name, struct fnode *parent);
 int vfs_opendir(uint32_t arg1);
 int vfs_readdir(uint32_t arg1, uint32_t arg2, uint32_t arg3);
 int vfs_closedir(uint32_t arg1);

@@ -39,9 +39,16 @@ int main(int argc, char **argv)
     if (fs->fd < 0)
         exit(2);
 
-    mount(fs);
+    vfs_init();
+    vfs_ls("/");
+    vfs_ls("/mnt/");
 
-    ls(fs, "/");
+    vfs_mount_fat(fs);
+
+    vfs_ls("/");
+    vfs_ls("/mnt/");
+
+    //ls(fs, "/");
 
     /* uncomment next two lines to make a file with content */
     //char *buf = "GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
@@ -49,11 +56,11 @@ int main(int argc, char **argv)
     //memset(buf, 'Z', 10240);
     //mk_file(fs, "/GRR", buf, 10240);
 
-    ls(fs, "/");
+    //ls(fs, "/");
 
     /* these would have to exist, but can be created by mk_file above */
     //cat(fs, "/ERR");
-    cat(fs, "/GRR");
+    //cat(fs, "/GRR");
     //cat(fs, "/FRR");
     //cat(fs, "/ZRR");
     //cat(fs, "/AARR");
@@ -64,13 +71,10 @@ int main(int argc, char **argv)
     //edit_file(fs, "/GRR");
     //cat(fs, "/GRR");
 
-    mb_close(fs->fd);
+    mb_close();
 
     free(fs);
 
-    vfs_init();
-    vfs_ls("/");
-    vfs_ls("/mnt/");
 
     // if you're happy and you know it,
     exit(0);

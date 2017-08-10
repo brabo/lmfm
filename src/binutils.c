@@ -28,6 +28,8 @@
 #include "fat.h"
 #include "vfs.h"
 
+
+/*
 int mount(struct fatfs *fs)
 {
     if (!fs)
@@ -35,7 +37,6 @@ int mount(struct fatfs *fs)
 
     return fat_mount(fs);
 }
-
 
 int ls(struct fatfs *fs, char *path)
 {
@@ -152,7 +153,14 @@ int edit_file(struct fatfs *fs, char *path)
 
     return res;
 }
-
+*/
+int vfs_mount_fat(struct fatfs *fs)
+{
+    if (!fs)
+        return -1;
+    vfs_mount("/dev/sd0", "/mnt", "fatfs", 0, NULL);
+    return 0;
+}
 
 int vfs_ls(char *path)
 {

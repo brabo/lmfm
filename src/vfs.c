@@ -30,6 +30,8 @@
 
 #define P_EXEC     0000001   // exec
 
+struct mountpoint *MTAB = NULL;
+
 /* ROOT entity ("/")
  *.
  */
@@ -68,7 +70,7 @@ static char *filename(char *path)
 }
 
 static struct fnode *_fno_search(const char *path, struct fnode *dir, int follow);
-static struct fnode *fno_search(const char *_path);
+struct fnode *fno_search(const char *_path);
 static struct fnode *_fno_create(struct module *owner, const char *name, struct fnode *parent);
 
 
@@ -312,7 +314,7 @@ static struct fnode *_fno_search(const char *path, struct fnode *dir, int follow
     return _fno_search(path_walk(path), dir->children, follow);
 }
 
-static struct fnode *fno_search(const char *_path)
+struct fnode *fno_search(const char *_path)
 {
     int i, len;
     struct fnode *fno = NULL;
@@ -371,6 +373,15 @@ static struct fnode *_fno_create(struct module *owner, const char *name, struct 
     return fno;
 }
 
+struct fnode *fno_create(struct module *owner, const char *name, struct fnode *parent)
+{
+    struct fnode *fno = _fno_create(owner, name, parent);
+//    if (fno && parent && parent->owner && parent->owner->ops.creat)
+//        parent->owner->ops.creat(fno);
+    fno->flags |= FL_RDWR;
+    return fno;
+}
+
 static void mkdir_links(struct fnode *fno)
 {
     char path[MAX_FILE], selfl[MAX_FILE], parentl[MAX_FILE];
@@ -386,7 +397,7 @@ static void mkdir_links(struct fnode *fno)
     }
 }
 
-static struct fnode *fno_mkdir(struct module *owner, const char *name, struct fnode *parent)
+struct fnode *fno_mkdir(struct module *owner, const char *name, struct fnode *parent)
 {
     struct fnode *fno = _fno_create(owner, name, parent);
     fno->flags |= (FL_DIR | FL_RDWR);
@@ -465,6 +476,18 @@ int vfs_stat(char *path, struct stat *st)
 
     if (fno->flags & FL_EXEC) {
         st->st_mode |= P_EXEC;
+    }
+    return 0;
+}
+
+int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *args)
+{
+    fatfs_mount(source, target, flags, args);
+    struct mountpoint *mp = malloc(sizeof(struct mountpoint));
+    if (mp) {
+        mp->target = fno_search(target);
+        mp->next = MTAB;
+        MTAB = mp;
     }
     return 0;
 }

@@ -1,9 +1,21 @@
 #ifndef __FAT_H
 #define __FAT_H
 
-struct bpb {
-    uint16_t    bps;
-    uint8_t     spc;
+#include "vfs.h"
+
+struct fatfs_disk {
+    struct fnode *blockdev;
+    struct fnode *mountpoint;
+    struct fatfs *fs;
+};
+
+struct fatfs_priv {
+    uint32_t            sclust;
+    uint32_t            cclust;
+    uint32_t            sect;
+    uint32_t            off;
+    uint32_t            dirsect;
+    struct fatfs_disk   *fsd;
 };
 
 struct fatfs {
@@ -11,11 +23,13 @@ struct fatfs {
     uint8_t     win[512];
     uint32_t    bsect;
     uint8_t     type;
-    struct bpb;
+    uint16_t    bps;
+    uint8_t     spc;
     uint32_t    database;
     uint32_t    fatbase;
     uint32_t    dirbase;
     uint32_t    n_fatent;
+    uint8_t     mounted;
 };
 
 struct fatfs_dir {
@@ -24,10 +38,9 @@ struct fatfs_dir {
     uint32_t    cclust;
     uint32_t    sect;
     uint32_t    off;
-    uint8_t     attr;
-    uint32_t    fsize;
     uint32_t    dirsect;
-    uint32_t    foff;
+    uint32_t    attr;
+    uint32_t    fsize;
 };
 
 /* Constants */
@@ -56,13 +69,11 @@ struct fatfs_dir {
 #define SEEK_CUR 1
 #define SEEK_END 2
 
-int print_array(uint8_t *buf, int len);
-int fat_mount(struct fatfs *fs);
-int fat_create(struct fatfs *fs, struct fatfs_dir *dj, char *path);
-int fat_open(struct fatfs *fs, struct fatfs_dir *dj, char *path);
-int fat_readdir(struct fatfs *fs, struct fatfs_dir *dj);
-int fat_read(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len);
-int fat_write(struct fatfs *fs, struct fatfs_dir *dj, uint8_t *buf, int len);
-int fat_lseek(struct fatfs *fs, struct fatfs_dir *dj, uint32_t offset);
+int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg);
+int fatfs_create(struct fnode *fno);
+int fatfs_read(struct fnode *fno, void *buf, unsigned int len);
+int fatfs_write(struct fnode *fno, const void *buf, unsigned int len);
+int fatfs_seek(struct fnode *fno, int off, int whence);
+int fatfs_close(struct fnode *fno);
 
 #endif

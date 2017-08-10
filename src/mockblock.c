@@ -28,15 +28,19 @@
 #include <fcntl.h>
 
 /* prototypes */
-int mb_read(int fd, void *_buf, uint32_t lba, int offset, int count);
-int mb_write(int fd, void *_buf, uint32_t lba, int offset, int count);
+int mb_read(void *fno, void *_buf, uint32_t lba, int offset, int count);
+int mb_write(void *fno, void *_buf, uint32_t lba, int offset, int count);
 int mb_init(char *mb_name);
+int mb_close(void);
 
-int mb_read(int fd, void *_buf, uint32_t lba, int offset, int count)
+int fd;
+
+int mb_read(void *fno, void *_buf, uint32_t lba, int offset, int count)
 {
     off_t off;
     int len;
 
+    printf("sector %d\noffset %d\n", lba, offset);
     off = lseek(fd, (off_t)((lba * 512) + offset), SEEK_SET);
     if (off < 0) {
         perror("mb_read: lseek: ");
@@ -60,7 +64,7 @@ int mb_read(int fd, void *_buf, uint32_t lba, int offset, int count)
     return len;
 }
 
-int mb_write(int fd, void *_buf, uint32_t lba, int offset, int count)
+int mb_write(void *fno, void *_buf, uint32_t lba, int offset, int count)
 {
     off_t off;
     int len;
@@ -90,8 +94,6 @@ int mb_write(int fd, void *_buf, uint32_t lba, int offset, int count)
 
 int mb_init(char *mb_name)
 {
-    int fd;
-
     if (!mb_name)
         return -1;
 
@@ -104,7 +106,7 @@ int mb_init(char *mb_name)
     return fd;
 }
 
-int mb_close(int fd)
+int mb_close(void)
 {
     close(fd);
 
