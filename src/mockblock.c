@@ -40,7 +40,7 @@ int mb_read(void *fno, void *_buf, uint32_t lba, int offset, int count)
     off_t off;
     int len;
 
-    printf("sector %d\noffset %d\n", lba, offset);
+    //printf("sector %d\noffset %d\n", lba, offset);
     off = lseek(fd, (off_t)((lba * 512) + offset), SEEK_SET);
     if (off < 0) {
         perror("mb_read: lseek: ");

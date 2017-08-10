@@ -144,7 +144,7 @@ static int path_abs(char *src, char *dst, int len)
 
 static struct fnode *fno_create_file(char *path)
 {
-    char *base = malloc(strlen(path) + 1);
+    char *base = malloc(MAX_FILE);
     struct module *owner = NULL;
     struct fnode *parent;
     struct fnode *f = NULL;

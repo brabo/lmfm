@@ -47,6 +47,9 @@ int main(int argc, char **argv)
 
     vfs_ls("/");
     vfs_ls("/mnt/");
+    vfs_ls("/mnt/BARDIR/");
+    vfs_ls("/mnt/BARDIR/DIR/");
+    vfs_ls("/mnt/BARDIR/DIR/DIR/");
 
     //ls(fs, "/");
 

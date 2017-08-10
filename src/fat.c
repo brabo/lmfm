@@ -233,6 +233,7 @@ static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
         dj->sect = fs->dirbase;
     } else {
         dj->sect = clust2sect(fs, dj->cclust);
+        dj->off = 0;
     }
 
     return 0;
@@ -249,12 +250,15 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
         dj->sect++;
         dj->off = 0;
     }
-    mb_read(fsd, fs->win, (dj->sect), 0, fs->bps);
+    //printf("off: %d\n", dj->off);
 
+    mb_read(fsd, fs->win, (dj->sect), 0, fs->bps);
+    //print_array(fs->win, 512);
     /* have to check cluster borders! */
     while (2 > 1) {
         uint8_t *off = fs->win + dj->off;
         if (!*off) /* Free FAT entry, no more FAT entries! */
+
             return -2;
         if (*(off + DIR_ATTR) & 0x0F) { /* LFN entry */
             dj->off += 32;
@@ -398,6 +402,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
     dj.fn = fbuf;
 
     if (clust > 0) {
+        //printf("trying to load non root directory %s\ncluster: %d\n", path, clust);
         dj.cclust = clust;
         dj.sclust = clust;
         res = 0;
@@ -407,7 +412,10 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 
     if (res == 0) {
         dir_rewind(f->fs, &dj);
+        //printf("Trying sect: %d\n", dj.sect);
+        //printf("Trying clust: %d\n", dj.sclust);
         while(dir_read(f, &dj) == 0) {
+            //printf("111\n");
             if (dj.attr & AM_DIR) {
                 char fullpath[128];
                 strncpy(fullpath, fpath, 128);
@@ -428,8 +436,11 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
                         ((struct fatfs_priv *)newdir->priv)->dirsect = dj.dirsect;
                         newdir->size = dj.fsize;
                         newdir->off = 0;
-                        //path = relative_path(f, fullpath);
-                        //fatfs_populate(f, path, get_clust(f->fs, (f->fs->win + (dj.off - 32))));
+                        path = relative_path(f, fullpath);
+                        //printf("trying path: %s\n", path);
+                        //printf("dj.fn: %s\n", dj.fn);
+                        if (strncmp(dj.fn, ".", 2) && strncmp(dj.fn, "..", 3))
+                            fatfs_populate(f, path, get_clust(f, (f->fs->win + (dj.off - 32))));
                     }
                 }
             } else {
@@ -472,7 +483,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
         return -1;
 
     tgt_dir = fno_search(tgt);
-    //src_dev = fno_search(source);
+//    src_dev = fno_search(source);
 
     if (!tgt_dir || ((tgt_dir->flags & FL_DIR) == 0)) {
         /* Not a valid mountpoint. */
@@ -796,25 +807,3 @@ int fatfs_close(struct fnode *fno)
     fno->off = 0;
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
