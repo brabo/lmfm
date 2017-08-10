@@ -492,6 +492,31 @@ int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *ar
     return 0;
 }
 
+struct fnode *vfs_open(void *arg1, uint32_t arg2)
+{
+    char *rel_path = (char *)arg1;
+    struct fnode *f;
+    uint32_t flags = arg2;
+    char path[MAX_FILE];
+    int ret;
+
+    path_abs(rel_path, path, MAX_FILE);
+    f = fno_search(path);
+    if (f) {
+        printf("Found the file..\n");
+        //fatfs_open(...)
+        return f;
+    }
+
+    return NULL;
+}
+
+int vfs_read(struct fnode *fno, void *buf, int len)
+{
+    return fatfs_read(fno, buf, len);
+}
+
+
 void vfs_init(void)
 {
     struct fnode *dev = NULL;

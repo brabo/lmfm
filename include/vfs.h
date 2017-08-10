@@ -73,5 +73,9 @@ int vfs_closedir(void * arg1);
 int vfs_stat(char *path, struct stat *st);
 void vfs_init(void);
 int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *args);
+struct fnode *vfs_open(void *arg1, uint32_t arg2);
+int vfs_read(struct fnode *fno, void *buf, int len);
+
+
 
 #endif

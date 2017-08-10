@@ -256,7 +256,7 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
     }
     //printf("off: %d\n", dj->off);
 
-    mb_read(fsd, fs->win, (dj->sect), 0, fs->bps);
+    disk_read(fsd, fs->win, (dj->sect), 0, fs->bps);
     //print_array(fs->win, 512);
     /* have to check cluster borders! */
     while (2 > 1) {
@@ -406,7 +406,6 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
     dj.fn = fbuf;
 
     if (clust > 0) {
-        //printf("trying to load non root directory %s\ncluster: %d\n", path, clust);
         dj.cclust = clust;
         dj.sclust = clust;
         res = 0;
@@ -416,56 +415,44 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 
     if (res == 0) {
         dir_rewind(f->fs, &dj);
-        //printf("Trying sect: %d\n", dj.sect);
-        //printf("Trying clust: %d\n", dj.sclust);
         while(dir_read(f, &dj) == 0) {
-            //printf("111\n");
+            if (!strncmp(dj.fn, ".", 2) || !strncmp(dj.fn, "..", 3))
+                continue;
+
+            struct fnode *newdir;
+
+            if (dj.attr & AM_DIR) {
+                newdir = fno_mkdir(NULL, dj.fn, parent);
+            } else {
+                newdir = fno_create(NULL, dj.fn, parent);
+            }
+
+            if (!newdir)
+                continue;
+
+            newdir->priv = (void *)kalloc(sizeof(struct fatfs_priv));
+            if (!newdir->priv) {
+                fno_unlink(newdir);
+                continue;
+            }
+
+            ((struct fatfs_priv *)newdir->priv)->sclust = dj.sclust;
+            ((struct fatfs_priv *)newdir->priv)->cclust = dj.cclust;
+            ((struct fatfs_priv *)newdir->priv)->sect = dj.sect;
+            ((struct fatfs_priv *)newdir->priv)->fsd = f;
+            ((struct fatfs_priv *)newdir->priv)->off = dj.off - 32;
+            ((struct fatfs_priv *)newdir->priv)->dirsect = dj.dirsect;
+
+            newdir->size = dj.fsize;
+            newdir->off = 0;
+
             if (dj.attr & AM_DIR) {
                 char fullpath[128];
                 strncpy(fullpath, fpath, 128);
-                struct fnode *newdir;
-                newdir = fno_mkdir(NULL, dj.fn, parent);
                 strcat(fullpath, "/");
                 strcat(fullpath, dj.fn);
-                if (newdir) {
-                    newdir->priv = (void *)kalloc(sizeof(struct fatfs_priv));
-                    if (!newdir->priv) {
-                        fno_unlink(newdir);
-                    } else {
-                        ((struct fatfs_priv *)newdir->priv)->sclust = dj.sclust;
-                        ((struct fatfs_priv *)newdir->priv)->cclust = dj.cclust;
-                        ((struct fatfs_priv *)newdir->priv)->sect = dj.sect;
-                        ((struct fatfs_priv *)newdir->priv)->fsd = f;
-                        ((struct fatfs_priv *)newdir->priv)->off = dj.off - 32;
-                        ((struct fatfs_priv *)newdir->priv)->dirsect = dj.dirsect;
-                        newdir->size = dj.fsize;
-                        newdir->off = 0;
-                        path = relative_path(f, fullpath);
-                        //printf("trying path: %s\n", path);
-                        //printf("dj.fn: %s\n", dj.fn);
-                        if (strncmp(dj.fn, ".", 2) && strncmp(dj.fn, "..", 3))
-                            fatfs_populate(f, path, get_clust(f->fs, (f->fs->win + (dj.off - 32))));
-                    }
-                }
-            } else {
-                struct fnode *newfile;
-                newfile = fno_create(NULL, dj.fn, parent);
-                if (newfile) {
-                    newfile->priv = (void *)kalloc(sizeof(struct fatfs_priv));
-                    if (!newfile->priv) {
-                        fno_unlink(newfile);
-                    } else {
-                        ((struct fatfs_priv *)newfile->priv)->sclust = dj.sclust;
-                        ((struct fatfs_priv *)newfile->priv)->cclust = dj.cclust;
-                        ((struct fatfs_priv *)newfile->priv)->sect = dj.sect;
-                        ((struct fatfs_priv *)newfile->priv)->fsd = f;
-                        ((struct fatfs_priv *)newfile->priv)->off = dj.off - 32;
-                        ((struct fatfs_priv *)newfile->priv)->dirsect = dj.dirsect;
-                        newfile->size = dj.fsize;
-                        newfile->off = 0;
-
-                    }
-                }
+                path = relative_path(f, fullpath);
+                fatfs_populate(f, path, get_clust(f->fs, (f->fs->win + (dj.off - 32))));
             }
         }
     }
@@ -628,7 +615,7 @@ int fatfs_create(struct fnode *fno)
 
     ret = add_dir(fs, &dj, path);
     set_clust(fs, (fs->win + dj.off), clust);
-    mb_write(fsd, fs->win, 0, dj.sect, fs->bps);
+    disk_write(fsd, fs->win, dj.sect, 0, fs->bps);
     priv->sclust = priv->cclust = clust;
     priv->sect = clust2sect(fs, priv->cclust);
     priv->off = dj.off;
@@ -651,15 +638,12 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
 
     /* calculate where to put sect and off! */
     off = fno->off;
-    while (off >= fs->bps) {
-        sect++;
-        off -= fs->bps;
-    }
 
-    while (sect >= fs->spc) {
-        clust++;
-        sect -= fs->spc;
-    }
+    sect = off / fs->bps;
+    off = off % fs->bps;
+
+    clust = sect / fs->spc;
+    sect = sect % fs->spc;
 
     tmpclust = priv->sclust;
     while(clust > 0) {
@@ -673,29 +657,20 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
 
     while ((r_len < len) && (fno->off < fno->size)) {
         int r = len - r_len;
-        int tmp;
         if (r > 512)
-            tmp = 512;
-        else
-            tmp = r;
+            r = 512;
 
-        if ((tmp == 512) && off > 0)
-            tmp -= off;
+        if ((r == 512) && off > 0)
+            r -= off;
 
-            if (fno->off + tmp > fno->size)
-                tmp = fno->size - fno->off;
+        if (fno->off + r > fno->size)
+            r = fno->size - fno->off;
 
-        disk_read(fsd, (buf + r_len), (priv->sect + sect), off, tmp);
+        disk_read(fsd, (buf + r_len), (priv->sect + sect), off, r);
 
-        //for (; r_len < fno->size && r_len < len && off < fs->bps; r_len++) {
-            //memcpy((buf + r_len), (fs->win + off), tmp);
-            //buf += tmp;
-            r_len += tmp;
-            //off += tmp;
-            //*(uint8_t *)buf++ = *(fs->win + off++);
-        //}
-        fno->off += tmp;
-        off += tmp;
+        r_len += r;
+        fno->off += r;
+        off += r;
         if ((r_len < len) && (off == fs->bps) && (fno->off < fno->size)) {
             sect++;
             if ((sect + 1) > fs->spc) {

@@ -11,5 +11,6 @@ int edit_file(struct fatfs *fs, char *path);
 /* VNZ NOTE: seems out of place in binutils, while having a vfs_ prefix? */
 int vfs_ls(char *path);
 int vfs_mount_fat(struct fatfs *fs);
+void vfs_cat(char *path);
 
 #endif

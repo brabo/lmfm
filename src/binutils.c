@@ -231,3 +231,27 @@ int vfs_ls(char *path)
 
     return 0;
 }
+
+void vfs_cat(char *path)
+{
+    printf("C:\\CAT %s\n", path);
+
+    struct fatfs_dir dj;
+    char fname[13];
+    memset(fname, 0x00, 13);
+    dj.fn = fname;
+
+    struct fnode *fno = vfs_open(path, O_RDONLY);
+
+    uint8_t *buf = malloc((fno->size + 1) * sizeof (uint8_t));
+    memset(buf, 0, (fno->size + 1));
+    int res = vfs_read(fno, buf, fno->size);
+
+    while (2 > 1) {
+        if (!*buf)
+            break;
+        putchar(*buf++);
+    }
+    printf("\n\n");
+
+}

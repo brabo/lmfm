@@ -72,7 +72,8 @@ int main(int argc, char **argv)
     //cat(fs, "/ZZRR");
 
     //edit_file(fs, "/GRR");
-    //cat(fs, "/GRR");
+    vfs_cat("/mnt/FOO");
+    vfs_cat("/mnt/LONGLO~1");
 
     mb_close();
 
