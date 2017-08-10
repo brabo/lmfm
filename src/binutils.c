@@ -180,7 +180,7 @@ int vfs_ls(char *path)
     if (!ep || !fname || !fpath)
         return -1;
 
-    d = (DIR *)vfs_opendir(path);
+    d = vfs_opendir(path); // FIXME: DIR* vs. struct fno *
     if (!d) {
         fprintf(stderr, "Error opening %s\r\n", path);
         return -2;
