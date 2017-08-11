@@ -206,7 +206,8 @@ static int walk_fat(struct fatfs_disk *fsd)
 {
     int fat;
     int clust = 2;
-    while (2 > 1) {
+
+   while (2 > 1) {
         fat = get_fat(fsd, clust);
         if (!fat)
             break;
@@ -263,8 +264,8 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
     while (2 > 1) {
         uint8_t *off = fs->win + dj->off;
         if (!*off) /* Free FAT entry, no more FAT entries! */
-
             return -2;
+
         if (*(off + DIR_ATTR) & 0x0F) { /* LFN entry */
             dj->off += 32;
             continue;
@@ -307,6 +308,7 @@ static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
 
     memset((fs->win + dj->off), 0, 0x20);
     memset((fs->win + dj->off), ' ', 11);
+
     int len = 0;
     while (len < nlen) {
         *(fs->win + dj->off + len) = name[len++];
@@ -323,6 +325,7 @@ static char *relative_path(struct fatfs_disk *f, char *abs)
 {
     if (!abs)
         return NULL;
+
     return (abs + strlen(f->mountpoint->fname) + 1);
 }
 
@@ -453,6 +456,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     if (check_fs(fsd) == -2) {
         fs->bsect = LD_WORD(fs->win + BS_BS);
         disk_read(fsd, fs->win, fs->bsect, 0, DEFBPS);
+
         if (check_fs(fsd) < 0) {
             goto fail;
         }
@@ -467,6 +471,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
 
     root_ents = LD_WORD(fs->win + BPB_ROOTENTS);
     root_secs = ((root_ents * 32) + (fs->bps -1)) / fs->bps;
+
     fatsz = LD_WORD(fs->win + BPB_FATSz16);
     if (!fatsz)
         fatsz = LD_DWORD(fs->win + BPB_FATSz32);
@@ -475,9 +480,11 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     rsvd_sec = LD_WORD(fs->win + BPB_RSVD_SEC);
     fs->database = rsvd_sec + (num_fats * fatsz) + root_secs;
     fs->database += fs->bsect;
+
     totsec = LD_WORD(fs->win + BPB_TOTSEC16);
     if (!totsec)
         totsec = LD_DWORD(fs->win + BPB_TOTSEC32);
+
     datasec = totsec - (rsvd_sec + (num_fats * fatsz) + root_secs);
     nclusts = datasec / fs->spc;
     fs->fatbase = rsvd_sec + fs->bsect;
@@ -497,11 +504,13 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
 
     fatfs_populate(fsd, "", 0);
     fs->mounted = 1;
+
     return 0;
 
 fail:
     kfree(fsd->fs);
     kfree(fsd);
+
     return -1;
 }
 
@@ -551,6 +560,7 @@ int fatfs_create(struct fnode *fno)
     ret = add_dir(fs, &dj, path);
     set_clust(fs, (fs->win + dj.off), clust);
     disk_write(fsd, fs->win, dj.sect, 0, fs->bps);
+
     priv->sclust = priv->cclust = clust;
     priv->sect = clust2sect(fs, priv->cclust);
     priv->off = dj.off;
@@ -564,6 +574,7 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
 {
     if (!fno || !fno->priv)
         return -1;
+
     struct fatfs_priv *priv = (struct fatfs_priv *)fno->priv;
 
     struct fatfs_disk *fsd = priv->fsd;
@@ -605,6 +616,7 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
         r_len += r;
         fno->off += r;
         off += r;
+
         if ((r_len < len) && (off == fs->bps) && (fno->off < fno->size)) {
             sect++;
             if ((sect + 1) > fs->spc) {
@@ -613,6 +625,7 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
                 sect = 0;
             }
         }
+
         off = 0;
     }
 
@@ -623,6 +636,7 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
 {
     if (!fno || !fno->priv)
         return -1;
+
     struct fatfs_priv *priv = (struct fatfs_priv *)fno->priv;
 
     struct fatfs_disk *fsd = priv->fsd;
@@ -688,9 +702,11 @@ int fatfs_seek(struct fnode *fno, int off, int whence)
 {
     struct fatfs_fnode *mfno;
     int new_off;
+
 //    mfno = FNO_MOD_PRIV(fno, &mod_fatfs);
 //    if (!mfno)
 //        return -1;
+
     switch(whence) {
         case SEEK_CUR:
             new_off = fno->off + off;
@@ -711,12 +727,15 @@ int fatfs_seek(struct fnode *fno, int off, int whence)
     if (new_off > fno->size) {
         return -1;
     }
+
     fno->off = new_off;
+
     return fno->off;
 }
 
 int fatfs_close(struct fnode *fno)
 {
     fno->off = 0;
+
     return 0;
 }

@@ -158,7 +158,9 @@ int vfs_mount_fat(struct fatfs *fs)
 {
     if (!fs)
         return -1;
+
     vfs_mount("/dev/sd0", "/mnt", "fatfs", 0, NULL);
+
     return 0;
 }
 
@@ -176,6 +178,7 @@ int vfs_ls(char *path)
 
     fname = malloc(MAX_FILE);
     fpath = malloc(MAX_FILE);
+
     ep = malloc(sizeof(struct dirent));
     if (!ep || !fname || !fpath)
         return -1;
@@ -185,6 +188,7 @@ int vfs_ls(char *path)
         fprintf(stderr, "Error opening %s\r\n", path);
         return -2;
     }
+
     printf("C:\\LS %s\n", path);
     while(vfs_readdir(d, ep, &result) == 0) {
 
@@ -252,7 +256,7 @@ void vfs_cat(char *path)
             break;
         putchar(*buf++);
     }
+
     printf("\n\n");
     fatfs_close(fno);
-
 }

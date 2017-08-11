@@ -42,6 +42,7 @@ static void basename_r(const char *path, char *res)
 {
     char *p;
     strncpy(res, path, strlen(path) + 1);
+
     p = res + strlen(res) - 1;
     while (p >= res) {
         if (*p == '/') {
@@ -50,22 +51,24 @@ static void basename_r(const char *path, char *res)
         }
         p--;
     }
+
     if (strlen(res) == 0) {
         res[0] = '/';
         res[1] = '\0';
     }
-
 }
 
 static char *filename(char *path)
 {
     int len = strlen(path);
+
     char *p = path + len - 1;
     while (p >= path) {
         if (*p == '/')
             return (p + 1);
         p--;
     }
+
     return path;
 }
 
@@ -77,30 +80,36 @@ static struct fnode *_fno_create(struct module *owner, const char *name, struct 
 static int _fno_fullpath(struct fnode *f, char *dst, char **p, int len)
 {
     int nlen;
+
     if (!f)
         return -EINVAL;
     if ((f->flags & FL_LINK) == FL_LINK) {
         f =  _fno_search(f->linkname, &FNO_ROOT, 1);
     }
+
     if (f == &FNO_ROOT) {
         *p = dst + 1;
         dst[0] = '/';
         dst[1] = '\0';
         return 0;
     }
+
     if (!*p) {
         if (!f->parent)
             return -EINVAL; // what to do, how is this possible?
         _fno_fullpath(f->parent, dst, p, len);
     }
+
     nlen = strlen(f->fname);
     if (nlen + (*p - dst) > (len -1))
         return -ENAMETOOLONG;
+
     memcpy(*p, f->fname, nlen);
     *p += nlen;
     *(*p) = '/';
     *p += 1;
     *(*p + 1) = '\0';
+
     return 0;
 }
 
@@ -108,6 +117,7 @@ int fno_fullpath(struct fnode *f, char *dst, int len)
 {
     char *p = NULL;
     int ret;
+
     ret =  _fno_fullpath(f, dst, &p, len);
     if (ret == 0)  {
         int nlen = strlen(dst);
@@ -119,14 +129,17 @@ int fno_fullpath(struct fnode *f, char *dst, int len)
                 nlen--;
             }
         }
+
         return nlen;
     }
+
     return -ENOENT;
 }
 
 static int path_abs(char *src, char *dst, int len)
 {
     struct fnode *f = &FNO_ROOT; //must fix this!
+
     if (src[0] == '/')
         strncpy(dst, src, len);
     else {
@@ -136,9 +149,11 @@ static int path_abs(char *src, char *dst, int len)
 
             strncat(dst, "/", len);
             strncat(dst, src, len);
+
             return 0;
         }
     }
+
     return 0;
 }
 
@@ -148,22 +163,28 @@ static struct fnode *fno_create_file(char *path)
     struct module *owner = NULL;
     struct fnode *parent;
     struct fnode *f = NULL;
+
     if (!base)
         return NULL;
+
     basename_r(path, base);
     parent = fno_search(base);
     free(base);
+
     if (!parent)
         return NULL;
+
     if ((parent->flags & FL_DIR) == 0)
         return NULL;
 
     if (parent) {
         owner = parent->owner;
     }
+
     f = _fno_create(owner, filename(path), parent);
     if (f)
         f->flags = 0;
+
     return f;
 }
 
@@ -175,9 +196,6 @@ void fno_unlink(struct fnode *fno)
         return;
     dir = fno->parent;
 
-    if (!fno)
-        return;
-
     if (dir) {
         struct fnode *child = dir->children;
         while (child) {
@@ -185,6 +203,7 @@ void fno_unlink(struct fnode *fno)
                 dir->children = fno->next;
                 break;
             }
+
             if (child->next == fno) {
                 child->next = fno->next;
                 break;
@@ -217,14 +236,16 @@ static struct fnode *fno_link(char *src, char *dst)
         return NULL;
 
     file_name_len = strlen(p_src);
-
     link->flags |= FL_LINK;
+
     link->linkname = malloc(file_name_len + 1);
     if (!link->linkname) {
         fno_unlink(link);
         return NULL;
     }
+
     strncpy(link->linkname, p_src, file_name_len + 1);
+
     return link;
 }
 
@@ -282,6 +303,7 @@ static struct fnode *_fno_search(const char *path, struct fnode *dir, int follow
     struct fnode *cur;
     char link[MAX_FILE];
     int check = 0;
+
     if (dir == NULL)
         return NULL;
 
@@ -306,11 +328,13 @@ static struct fnode *_fno_search(const char *path, struct fnode *dir, int follow
     /* path is correct, need to walk more */
     if( (dir->flags & FL_LINK ) == FL_LINK ){
     /* passing through a symlink */
-        strcpy( link, dir->linkname );
-        strcat( link, "/" );
-        strcat( link, path_walk(path));
-        return _fno_search( link, &FNO_ROOT, follow );
+        strcpy(link, dir->linkname);
+        strcat(link, "/");
+        strcat(link, path_walk(path));
+
+        return _fno_search(link, &FNO_ROOT, follow);
     }
+
     return _fno_search(path_walk(path), dir->children, follow);
 }
 
@@ -319,6 +343,7 @@ struct fnode *fno_search(const char *_path)
     int i, len;
     struct fnode *fno = NULL;
     char *path = NULL;
+
     if (!_path)
         return NULL;
 
@@ -339,10 +364,13 @@ struct fnode *fno_search(const char *_path)
         else
             break;
     }
+
     if (strlen(path) > 0) {
         fno = _fno_search(path, &FNO_ROOT, 1);
     }
+
     free(path);
+
     return fno;
 }
 
@@ -350,6 +378,7 @@ static struct fnode *_fno_create(struct module *owner, const char *name, struct 
 {
     struct fnode *fno = calloc(sizeof(struct fnode), 1);
     int nlen = strlen(name);
+
     if (!fno)
         return NULL;
 
@@ -360,6 +389,7 @@ static struct fnode *_fno_create(struct module *owner, const char *name, struct 
     }
 
     memcpy(fno->fname, name, nlen + 1);
+
     if (!parent) {
         parent = &FNO_ROOT;
     }
@@ -367,9 +397,9 @@ static struct fnode *_fno_create(struct module *owner, const char *name, struct 
     fno->parent = parent;
     fno->next = fno->parent->children;
     fno->parent->children = fno;
-
     fno->children = NULL;
     fno->owner = owner;
+
     return fno;
 }
 
@@ -385,11 +415,13 @@ struct fnode *fno_create(struct module *owner, const char *name, struct fnode *p
 static void mkdir_links(struct fnode *fno)
 {
     char path[MAX_FILE], selfl[MAX_FILE], parentl[MAX_FILE], path_basename[MAX_FILE];
-    fno_fullpath(fno, path, MAX_FILE -4);
+
+    fno_fullpath(fno, path, MAX_FILE - 4);
     strcpy(selfl, path);
     strcpy(parentl, path);
     strcat(selfl, "/.");
     strcat(parentl, "/..");
+
     if (fno) {
         fno_link(path, selfl);
         basename_r(path, path_basename);
@@ -407,10 +439,11 @@ struct fnode *fno_mkdir(struct module *owner, const char *name, struct fnode *pa
     return fno;
 }
 
-struct fnode * vfs_opendir(void *arg1)
+struct fnode *vfs_opendir(void *arg1)
 {
     struct fnode *fno;
     fno = fno_search((char *)arg1);
+
     if (fno && (fno->flags & FL_DIR)) {
         if (fno->flags & FL_INUSE)
             return NULL; /* XXX EBUSY */
@@ -433,25 +466,30 @@ int vfs_readdir(void *arg1, void * arg2, void * arg3)
     fno = (struct fnode *)arg1;
     ep = (struct dirent *)arg2;
     res = (struct dirent **)arg3;
-
     next = (struct fnode *)fno->off;
+
     if (!fno || !ep)
         return -ENOENT;
+
     if (!next) {
         return -1;
     }
+
     fno->off = (int)next->next;
     ep->d_ino = 0; /* TODO: populate with inode? */
     strncpy(ep->d_name, next->fname, 256);
     *res = ep;
+
     return 0;
 }
 
-int vfs_closedir(void * arg1)
+int vfs_closedir(void *arg1)
 {
     struct fnode *fno = (struct fnode *)arg1;
+
     fno->off = 0;
     fno->flags &= ~(FL_INUSE);
+
     return 0;
 }
 
@@ -459,11 +497,14 @@ int vfs_stat(char *path, struct stat *st)
 {
     char abs_p[MAX_FILE];
     struct fnode *fno;
+
     path_abs(path, abs_p, MAX_FILE);
     fno = _fno_search(abs_p, &FNO_ROOT, 0);
+
     if (!fno) {
         return -ENOENT;
     }
+
     if (fno->flags & FL_DIR) {
         st->st_mode = S_IFDIR;
         st->st_size = 0;
@@ -477,6 +518,7 @@ int vfs_stat(char *path, struct stat *st)
     if (fno->flags & FL_EXEC) {
         st->st_mode |= P_EXEC;
     }
+
     return 0;
 }
 
@@ -484,11 +526,13 @@ int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *ar
 {
     fatfs_mount(source, target, flags, args);
     struct mountpoint *mp = malloc(sizeof(struct mountpoint));
+
     if (mp) {
         mp->target = fno_search(target);
         mp->next = MTAB;
         MTAB = mp;
     }
+
     return 0;
 }
 
@@ -501,6 +545,7 @@ struct fnode *vfs_open(void *arg1, uint32_t arg2)
     int ret;
 
     path_abs(rel_path, path, MAX_FILE);
+
     f = fno_search(path);
     if (f) {
         //fatfs_open(...)
@@ -514,7 +559,6 @@ int vfs_read(struct fnode *fno, void *buf, int len)
 {
     return fatfs_read(fno, buf, len);
 }
-
 
 void vfs_init(void)
 {
