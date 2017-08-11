@@ -90,6 +90,8 @@ int print_array(uint8_t *buf, int len)
 #define LD_WORD(ptr)        (uint16_t)(*(uint16_t *)(ptr))
 #define LD_DWORD(ptr)       (uint32_t)(*(uint32_t *)(ptr))
 
+#define CLUST2SECT(f, c) (((c - 2) * f->spc + f->database))
+
 static void st_word(uint8_t *ptr, uint16_t val)  /* Store a 2-byte word in little-endian */
 {
     *ptr++ = (uint8_t)val;
@@ -144,7 +146,7 @@ static int get_fat(struct fatfs_disk *fsd, int clust)
     case FAT32:
         if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps) < 0) break;
 
-        return (LD_DWORD(fs->win + ((clust * 4) % fs->bps)) & 0x0FFFFFFF);
+        return (LD_DWORD(fs->win + ((clust * 4) & (fs->bps - 1))) & 0x0FFFFFFF);
     }
     return -2;
 }
@@ -166,17 +168,11 @@ static int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val)
         break;
     case FAT32:
         if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps) < 0) break;
-        st_dword((fs->win + ((clust * 4) % fs->bps)), (uint32_t)(val & 0x0FFFFFFF));
+        st_dword((fs->win + ((clust * 4) & (fs->bps - 1))), (uint32_t)(val & 0x0FFFFFFF));
         disk_write(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps);
         return 0;
     }
     return -2;
-}
-
-static int clust2sect(struct fatfs *fs, uint32_t clust)
-{
-    clust -= 2;
-    return ((clust * fs->spc + fs->database));
 }
 
 static int get_clust(struct fatfs *fs, uint8_t *dir)
@@ -223,7 +219,7 @@ static int init_fat(struct fatfs_disk *fsd)
 
     int clust = walk_fat(fsd);
 
-    st_dword((fs->win + ((clust * 4) % fs->bps)), 0x0FFFFFFF);
+    st_dword((fs->win + ((clust * 4) & (fs->bps - 1))), 0x0FFFFFFF);
     disk_write(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps);
 
     return clust;
@@ -237,7 +233,7 @@ static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
     if (!dj->cclust)
         dj->sect = fs->dirbase;
     else
-        dj->sect = clust2sect(fs, dj->cclust);
+        dj->sect = CLUST2SECT(fs, dj->cclust);
 
     dj->off = 0;
 
@@ -504,7 +500,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     datasec = totsec - (rsvd_sec + (num_fats * fatsz) + root_secs);
     nclusts = datasec / fs->spc;
     fs->fatbase = rsvd_sec + fs->bsect;
-    fs->dirbase = clust2sect(fs, LD_DWORD(fs->win + BPB_ROOTCLUS));
+    fs->dirbase = CLUST2SECT(fs, LD_DWORD(fs->win + BPB_ROOTCLUS));
 
     /* FAT type determination */
     if (nclusts < 4085)
@@ -576,7 +572,7 @@ int fatfs_create(struct fnode *fno)
     disk_write(fsd, fs->win, dj.sect, 0, fs->bps);
 
     priv->sclust = priv->cclust = clust;
-    priv->sect = clust2sect(fs, priv->cclust);
+    priv->sect = CLUST2SECT(fs, priv->cclust);
     priv->off = dj.off;
     fno->off = 0;
     fno->size = 0;
@@ -598,18 +594,12 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
     /* calculate where to put sect and off! */
     off = fno->off;
     sect = off / fs->bps;
-    off = off % fs->bps;
+    off = off & (fs->bps - 1);
     clust = sect / fs->spc;
-    sect = sect % fs->spc;
+    sect = sect & (fs->spc - 1);
 
-    /* walk cluster chain until we have right cluster! */
     priv->cclust = priv->fat[clust];
-    //while(clust > 0) {
-    //    priv->cclust = get_fat(fsd, priv->cclust);
-    //    clust--;
-    //}
-
-    priv->sect = clust2sect(fs, priv->cclust);
+    priv->sect = CLUST2SECT(fs, priv->cclust);
 
     while ((r_len < len) && (fno->off < fno->size)) {
         int r = len - r_len;
@@ -633,8 +623,7 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
             if ((sect + 1) > fs->spc) {
                 clust++;
                 priv->cclust = priv->fat[clust];
-                //priv->cclust = get_fat(fsd, priv->cclust);
-                priv->sect = clust2sect(fs, priv->cclust);
+                priv->sect = CLUST2SECT(fs, priv->cclust);
                 sect = 0;
             }
         }
@@ -675,7 +664,7 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
     }
 
     priv->cclust = tmpclust;
-    priv->sect = clust2sect(fs, priv->cclust);
+    priv->sect = CLUST2SECT(fs, priv->cclust);
 
     while (w_len < len) {
         disk_read(fsd, fs->win, (priv->sect + sect), 0, fs->bps);
@@ -693,7 +682,7 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
                 uint32_t tempclus = priv->cclust;
                 priv->cclust = init_fat(fsd);
                 set_fat(fsd, tempclus, priv->cclust);
-                priv->sect = clust2sect(fs, priv->cclust);
+                priv->sect = CLUST2SECT(fs, priv->cclust);
                 sect = 0;
             }
         }

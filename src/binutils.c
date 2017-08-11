@@ -277,7 +277,7 @@ void vfs_fuzz(char *path)
     srand(time(NULL));
     int i, n, o;
 
-    for (i = 0; i < 10; i++) {
+    for (i = 0; i < 100; i++) {
         n = rand() % fno->size;
         o = rand() % fno->size;
 
@@ -291,7 +291,7 @@ void vfs_fuzz(char *path)
         }
 
         res = vfs_read(fno, buf, n);
-        print_array(buf, n);
+        //print_array(buf, n);
     }
 
     printf("If you see me, we did not crash!\n\n");
