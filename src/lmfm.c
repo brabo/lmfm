@@ -54,6 +54,7 @@ int main(int argc, char **argv)
     //edit_file(fs, "/GRR");
     vfs_cat("/mnt/FOO");
     vfs_cat("/mnt/LONGLO~1");
+    vfs_fuzz("/mnt/DOOM1.WAD");
 
     mb_close();
 

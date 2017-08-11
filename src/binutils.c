@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <dirent.h>
+#include <time.h>
 #include "fat.h"
 #include "vfs.h"
 
@@ -156,6 +157,8 @@ int edit_file(struct fatfs *fs, char *path)
 */
 int vfs_mount_fat(struct fatfs *fs)
 {
+    printf("\nC:\\MOUNT /dev/sd0 /mnt\n");
+
     if (!fs)
         return -1;
 
@@ -166,6 +169,8 @@ int vfs_mount_fat(struct fatfs *fs)
 
 int vfs_ls(char *path)
 {
+    printf("\nC:\\LS %s\n", path);
+
     char *fname;
     char *fpath;
     struct dirent *ep, *result;
@@ -189,7 +194,6 @@ int vfs_ls(char *path)
         return -2;
     }
 
-    printf("C:\\LS %s\n", path);
     while(vfs_readdir(d, ep, &result) == 0) {
 
         fname[0] = '\0';
@@ -227,7 +231,6 @@ int vfs_ls(char *path)
             fprintf(stderr, "stat error on %s: %s.\r\n", fname, strerror(errno));
         }
     }
-    printf("\n");
     vfs_closedir(d);
     free(ep);
     free(fname);
@@ -238,7 +241,7 @@ int vfs_ls(char *path)
 
 void vfs_cat(char *path)
 {
-    printf("C:\\CAT %s\n", path);
+    printf("\nC:\\CAT %s\n", path);
 
     struct fatfs_dir dj;
     char fname[13];
@@ -257,6 +260,41 @@ void vfs_cat(char *path)
         putchar(*buf++);
     }
 
-    printf("\n\n");
+    fatfs_close(fno);
+}
+
+void vfs_fuzz(char *path)
+{
+    printf("\nC:\\FUZZ %s\n", path);
+
+    struct fatfs_dir dj;
+    char fname[13];
+    memset(fname, 0x00, 13);
+    dj.fn = fname;
+
+    struct fnode *fno = vfs_open(path, O_RDONLY);
+
+    srand(time(NULL));
+    int i, n, o;
+
+    for (i = 0; i < 10; i++) {
+        n = rand() % fno->size;
+        o = rand() % fno->size;
+
+        uint8_t *buf = malloc((n + 1) * sizeof (uint8_t));
+        memset(buf, 0, (n + 1));
+
+        int res = vfs_seek(fno, o, SEEK_SET);
+        if (res != o) {
+            printf("OOPS..\n");
+            continue;
+        }
+
+        res = vfs_read(fno, buf, n);
+        print_array(buf, n);
+    }
+
+    printf("If you see me, we did not crash!\n\n");
+
     fatfs_close(fno);
 }

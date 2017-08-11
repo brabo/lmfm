@@ -12,5 +12,6 @@ int edit_file(struct fatfs *fs, char *path);
 int vfs_ls(char *path);
 int vfs_mount_fat(struct fatfs *fs);
 void vfs_cat(char *path);
+void vfs_fuzz(char *path);
 
 #endif

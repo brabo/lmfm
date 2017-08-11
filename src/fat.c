@@ -27,7 +27,7 @@
 #include "vfs.h"
 #include "mockblock.h"
 
-static int print_array(uint8_t *buf, int len)
+int print_array(uint8_t *buf, int len)
 {
     char *bugger = malloc(sizeof(uint8_t) * ((len * 2) + 3));
     char *ptr = bugger;
@@ -48,7 +48,7 @@ static int print_array(uint8_t *buf, int len)
 }
 
 #define kalloc(s) malloc(s)
-#define kcalloc(n,s) calloc(n,s)
+#define kcalloc(n,s) calloc(s,n)
 #define kfree(p) free(p)
 
 /* Macro proxies for disk operations */
@@ -234,12 +234,12 @@ static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
     if (dj->cclust == 1 || dj->cclust >= fs->n_fatent)
         return -1;
 
-    if (!dj->cclust) {
+    if (!dj->cclust)
         dj->sect = fs->dirbase;
-    } else {
+    else
         dj->sect = clust2sect(fs, dj->cclust);
-        dj->off = 0;
-    }
+
+    dj->off = 0;
 
     return 0;
 }
@@ -274,12 +274,14 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
             char *p = dj->fn;
             memset(dj->fn, 0x00, 13);
             char c;
+
             for (i = 0; i < 8; i++) {   /* Copy file name body */
                 c = off[i];
                 if (c == ' ') break;
                 if (c == 0x05) c = 0xE5;
                 *p++ = c;
             }
+
             if (off[8] != ' ') {        /* Copy file name extension */
                 *p++ = '.';
                 for (i = 8; i < 11; i++) {
@@ -288,11 +290,13 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
                     *p++ = c;
                 }
             }
+
             dj->attr = *(off + DIR_ATTR);
             dj->sclust = get_clust(fs, off);
             dj->fsize = LD_DWORD(off + DIR_FSIZE);
             dj->dirsect = dj->sect;
             dj->off += 32;
+
             break;
         }
     }
@@ -336,7 +340,6 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
     struct fatfs_dir dj;
     struct fnode *parent;
     char fpath[MAXPATHLEN];
-    int res;
 
     fno_fullpath(f->mountpoint, fpath, MAXPATHLEN);
 
@@ -349,25 +352,24 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
     parent = fno_search(fpath);
     parent->priv = (void *)kalloc(sizeof(struct fatfs_priv));
     ((struct fatfs_priv *)parent->priv)->fsd = f;
-    dj.fn = fbuf;
 
+    dj.fn = fbuf;
     dj.cclust = clust;
     dj.sclust = clust;
-
     dj.off = 0;
 
     dir_rewind(f->fs, &dj);
+
     while(dir_read(f, &dj) == 0) {
        if (!strncmp(dj.fn, ".", 2) || !strncmp(dj.fn, "..", 3))
             continue;
 
         struct fnode *newdir;
 
-        if (dj.attr & AM_DIR) {
+        if (dj.attr & AM_DIR)
             newdir = fno_mkdir(NULL, dj.fn, parent);
-        } else {
+        else
             newdir = fno_create(NULL, dj.fn, parent);
-        }
 
         if (!newdir)
             continue;
@@ -388,6 +390,17 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 
         newdir->size = dj.fsize;
         newdir->off = 0;
+
+        int i = 0;
+        uint32_t nclust = newdir->size / (f->fs->spc * f->fs->bps);
+        priv->fat = kcalloc(sizeof (uint32_t), nclust + 2);
+        uint32_t tmpclust = priv->sclust;
+        priv->fat[i++] = tmpclust;
+        while (nclust > 0) {
+            priv->fat[i] = get_fat(f, tmpclust);
+            tmpclust = priv->fat[i++];
+            nclust--;
+        }
 
         if (dj.attr & AM_DIR) {
             char fullpath[128];
@@ -446,6 +459,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     }
 
     struct fatfs *fs = fsd->fs;
+    /* do we still need this?? */
     fs->mounted = 0;
 
     /* Associate the mount point */
@@ -492,15 +506,13 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     fs->fatbase = rsvd_sec + fs->bsect;
     fs->dirbase = clust2sect(fs, LD_DWORD(fs->win + BPB_ROOTCLUS));
 
-    // fat type determination
-
-    if (nclusts < 4085) {
+    /* FAT type determination */
+    if (nclusts < 4085)
         fs->type = FAT12;
-    } else if (nclusts < 65525) {
+    else if (nclusts < 65525)
         fs->type = FAT16;
-    } else {
+    else
         fs->type = FAT32;
-    }
 
     fs->n_fatent = nclusts + 2;
 
@@ -578,7 +590,6 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
         return -1;
 
     struct fatfs_priv *priv = (struct fatfs_priv *)fno->priv;
-
     struct fatfs_disk *fsd = priv->fsd;
     struct fatfs *fs = fsd->fs;
 
@@ -586,19 +597,17 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
 
     /* calculate where to put sect and off! */
     off = fno->off;
-
     sect = off / fs->bps;
     off = off % fs->bps;
-
     clust = sect / fs->spc;
     sect = sect % fs->spc;
 
-    priv->cclust = priv->sclust;
-    while(clust > 0) {
-        /* walk cluster chain until we have right cluster! */
-        priv->cclust = get_fat(fsd, priv->cclust);
-        clust--;
-    }
+    /* walk cluster chain until we have right cluster! */
+    priv->cclust = priv->fat[clust];
+    //while(clust > 0) {
+    //    priv->cclust = get_fat(fsd, priv->cclust);
+    //    clust--;
+    //}
 
     priv->sect = clust2sect(fs, priv->cclust);
 
@@ -622,12 +631,13 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
         if ((r_len < len) && (off == fs->bps) && (fno->off < fno->size)) {
             sect++;
             if ((sect + 1) > fs->spc) {
-                priv->cclust = get_fat(fsd, priv->cclust);
+                clust++;
+                priv->cclust = priv->fat[clust];
+                //priv->cclust = get_fat(fsd, priv->cclust);
                 priv->sect = clust2sect(fs, priv->cclust);
                 sect = 0;
             }
         }
-
         off = 0;
     }
 
@@ -640,7 +650,6 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
         return -1;
 
     struct fatfs_priv *priv = (struct fatfs_priv *)fno->priv;
-
     struct fatfs_disk *fsd = priv->fsd;
     struct fatfs *fs = fsd->fs;
 
@@ -726,9 +735,8 @@ int fatfs_seek(struct fnode *fno, int off, int whence)
     if (new_off < 0)
         new_off = 0;
 
-    if (new_off > fno->size) {
+    if (new_off > fno->size)
         return -1;
-    }
 
     fno->off = new_off;
 

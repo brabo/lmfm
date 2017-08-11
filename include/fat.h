@@ -16,6 +16,7 @@ struct fatfs_priv {
     uint32_t            off;
     uint32_t            dirsect;
     struct fatfs_disk   *fsd;
+    uint32_t            *fat;
 };
 
 struct fatfs {
@@ -69,6 +70,7 @@ struct fatfs_dir {
 #define SEEK_CUR 1
 #define SEEK_END 2
 
+int print_array(uint8_t *buf, int len);
 int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg);
 int fatfs_create(struct fnode *fno);
 int fatfs_read(struct fnode *fno, void *buf, unsigned int len);

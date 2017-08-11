@@ -560,6 +560,11 @@ int vfs_read(struct fnode *fno, void *buf, int len)
     return fatfs_read(fno, buf, len);
 }
 
+int vfs_seek(struct fnode *fno, int off, int whence)
+{
+    return fatfs_seek(fno, off, whence);
+}
+
 void vfs_init(void)
 {
     struct fnode *dev = NULL;
