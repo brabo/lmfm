@@ -49,27 +49,7 @@ int main(int argc, char **argv)
     vfs_ls("/mnt/");
     vfs_ls("/mnt/BARDIR/");
     vfs_ls("/mnt/BARDIR/DIR/");
-    vfs_ls("/mnt/BARDIR/DIR/DIR/");
-
-    //ls(fs, "/");
-
-    /* uncomment next two lines to make a file with content */
-    //char *buf = "GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
-    //uint8_t *buf = malloc(10240 * sizeof (uint8_t));
-    //memset(buf, 'Z', 10240);
-    //mk_file(fs, "/GRR", buf, 10240);
-
-    //ls(fs, "/");
-
-    /* these would have to exist, but can be created by mk_file above */
-    //cat(fs, "/ERR");
-    //cat(fs, "/GRR");
-    //cat(fs, "/FRR");
-    //cat(fs, "/ZRR");
-    //cat(fs, "/AARR");
-    //cat(fs, "/BBRR");
-    //cat(fs, "/GGRR");
-    //cat(fs, "/ZZRR");
+    vfs_cat("/mnt/BARDIR/DIR/DIR/");
 
     //edit_file(fs, "/GRR");
     vfs_cat("/mnt/FOO");
@@ -78,7 +58,6 @@ int main(int argc, char **argv)
     mb_close();
 
     free(fs);
-
 
     // if you're happy and you know it,
     exit(0);

@@ -256,10 +256,9 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
         dj->sect++;
         dj->off = 0;
     }
-    //printf("off: %d\n", dj->off);
 
     disk_read(fsd, fs->win, (dj->sect), 0, fs->bps);
-    //print_array(fs->win, 512);
+
     /* have to check cluster borders! */
     while (2 > 1) {
         uint8_t *off = fs->win + dj->off;
@@ -449,13 +448,11 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     //tgt_dir->owner = &mod_fatfs;
     fs->bsect = 0;
 
-    printf("bsect: %d\n", fs->bsect);
     disk_read(fsd, fs->win, fs->bsect, 0, DEFBPS);
 
     if (check_fs(fsd) == -2) {
         fs->bsect = LD_WORD(fs->win + BS_BS);
         disk_read(fsd, fs->win, fs->bsect, 0, DEFBPS);
-        print_array(fs->win, 512);
         if (check_fs(fsd) < 0) {
             goto fail;
         }
@@ -572,7 +569,7 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
     struct fatfs_disk *fsd = priv->fsd;
     struct fatfs *fs = fsd->fs;
 
-    int r_len = 0, sect = 0, off = 0, clust = 0, tmpclust = 0;
+    int r_len = 0, sect = 0, off = 0, clust = 0;
 
     /* calculate where to put sect and off! */
     off = fno->off;
@@ -583,14 +580,13 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
     clust = sect / fs->spc;
     sect = sect % fs->spc;
 
-    tmpclust = priv->sclust;
+    priv->cclust = priv->sclust;
     while(clust > 0) {
         /* walk cluster chain until we have right cluster! */
-        tmpclust = get_fat(fsd, tmpclust);
+        priv->cclust = get_fat(fsd, priv->cclust);
         clust--;
     }
 
-    priv->cclust = tmpclust;
     priv->sect = clust2sect(fs, priv->cclust);
 
     while ((r_len < len) && (fno->off < fno->size)) {

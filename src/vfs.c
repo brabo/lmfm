@@ -503,7 +503,6 @@ struct fnode *vfs_open(void *arg1, uint32_t arg2)
     path_abs(rel_path, path, MAX_FILE);
     f = fno_search(path);
     if (f) {
-        printf("Found the file..\n");
         //fatfs_open(...)
         return f;
     }
