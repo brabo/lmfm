@@ -169,7 +169,7 @@ int vfs_ls(char *path)
     char *fname;
     char *fpath;
     struct dirent *ep, *result;
-    DIR *d;
+    void *d;
     struct stat st;
     char type;
     int i;

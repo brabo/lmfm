@@ -332,6 +332,7 @@ static char *relative_path(struct fatfs_disk *f, char *abs)
 static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 {
     char fbuf[13];
+    struct fatfs_priv *priv;
     struct fatfs_dir dj;
     struct fnode *parent;
     char fpath[MAXPATHLEN];
@@ -377,12 +378,13 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
             continue;
         }
 
-        ((struct fatfs_priv *)newdir->priv)->sclust = dj.sclust;
-        ((struct fatfs_priv *)newdir->priv)->cclust = dj.cclust;
-        ((struct fatfs_priv *)newdir->priv)->sect = dj.sect;
-        ((struct fatfs_priv *)newdir->priv)->fsd = f;
-        ((struct fatfs_priv *)newdir->priv)->off = dj.off - 32;
-        ((struct fatfs_priv *)newdir->priv)->dirsect = dj.dirsect;
+        priv = newdir->priv;
+        priv->sclust = dj.sclust;
+        priv->cclust = dj.cclust;
+        priv->sect = dj.sect;
+        priv->fsd = f;
+        priv->off = dj.off - 32;
+        priv->dirsect = dj.dirsect;
 
         newdir->size = dj.fsize;
         newdir->off = 0;
