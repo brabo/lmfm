@@ -665,6 +665,8 @@ int fatfs_create(struct fnode *fno)
     disk_write(fsd, fs->win, dj.sect, 0, fs->bps);
 
     priv->sclust = priv->cclust = clust;
+    priv->fat = kcalloc(3, sizeof (uint32_t));
+    priv->fat[0] = priv->sclust;
     priv->sect = CLUST2SECT(fs, priv->cclust);
     priv->off = dj.off;
     fno->off = 0;
@@ -740,36 +742,26 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
 
     /* calculate where to put sect and off! */
     off = fno->off;
-    while (off >= fs->bps) {
-        sect++;
-        off -= fs->bps;
-    }
+    sect = off / fs->bps;
+    off = off & (fs->bps - 1);
+    clust = sect / fs->spc;
+    sect = sect & (fs->spc - 1);
 
-    while (sect >= fs->spc) {
-        clust++;
-        sect -= fs->spc;
-    }
-
-    tmpclust = priv->sclust;
-    while(clust > 0) {
-        /* walk cluster chain until we have right cluster! */
-        tmpclust = get_fat(fsd, tmpclust);
-        clust--;
-    }
-
-    priv->cclust = tmpclust;
+    priv->cclust = priv->fat[clust];
     priv->sect = CLUST2SECT(fs, priv->cclust);
 
     while (w_len < len) {
-        disk_read(fsd, fs->win, (priv->sect + sect), 0, fs->bps);
+        int r = len - w_len;
+        if (r > 512)
+            r = 512;
 
-        for (; w_len < len && off < fs->bps; w_len++) {
-            //*(fs->win + off++) = *(uint8_t *)buf++;
-            memcpy((fs->win + off++), (buf++), 1);
-        }
-        disk_write(fsd, fs->win, (priv->sect + sect), 0, fs->bps);
-        fno->off += off;
-        off = 0;
+        if ((r == 512) && off > 0)
+            r -= off;
+
+        disk_write(fsd, buf, (priv->sect + sect), off, r);
+        w_len += r;
+        fno->off += r;
+        off += r;
         if ((w_len < len) && (off == fs->bps)) {
             sect++;
             if ((sect + 1) > fs->spc) {
@@ -780,14 +772,13 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
                 sect = 0;
             }
         }
+        off = 0;
     }
 
-    if (fno->off > fno->size) {
-        fno->size = fno->off;
-        disk_read(fsd, fs->win, priv->dirsect, 0, fs->bps);
-        st_dword((fs->win + priv->off + DIR_FSIZE), (uint32_t)fno->size);
-        disk_write(fsd, fs->win, priv->dirsect, 0, fs->bps);
-    }
+    fno->size = fno->off;
+    disk_read(fsd, fs->win, priv->dirsect, 0, fs->bps);
+    st_dword((fs->win + priv->off + DIR_FSIZE), (uint32_t)fno->size);
+    disk_write(fsd, fs->win, priv->dirsect, 0, fs->bps);
 
     return w_len;
 }

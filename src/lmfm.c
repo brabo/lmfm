@@ -61,6 +61,14 @@ int main(int argc, char **argv)
     vfs_touch("/mnt/BARDIR/LMFM42");
     vfs_ls("/mnt/BARDIR/");
 
+    char *buf = "BARDIR/GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
+    //uint8_t *buf = malloc(10240 * sizeof (uint8_t));
+    //memset(buf, 'Z', 10240);
+    mk_file("/mnt/BARDIR/GRR", buf, 61);
+    vfs_cat("/mnt/GRR");
+    vfs_cat("/mnt/BARDIR/GRR");
+    vfs_ls("/mnt/");
+
     mb_close();
 
     free(fs);

@@ -229,3 +229,21 @@ int vfs_touch(char *path)
 
     return 0;
 }
+
+int mk_file(char *path, uint8_t *buf, int len)
+{
+    if (!path)
+        return -1;
+
+    printf("C:\\CP MEM %s\n", path);
+
+    struct fnode *fno = vfs_open(path, O_RDONLY);
+    if (!fno)
+        return -2;
+
+    int res = vfs_write(fno, buf, len);
+
+    fatfs_close(fno);
+
+    return res;
+}
