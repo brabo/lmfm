@@ -49,6 +49,7 @@ int print_array(uint8_t *buf, int len)
 
 #define kalloc(s) malloc(s)
 #define kcalloc(n,s) calloc(s,n)
+#define krealloc(p,s) realloc(p,s)
 #define kfree(p) free(p)
 
 /* Macro proxies for disk operations */
@@ -768,7 +769,7 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
                 clust++;
                 uint32_t tempclus = priv->cclust;
                 priv->cclust = init_fat(fsd);
-                uint32_t *tmp = realloc(priv->fat, ((sizeof (uint32_t)) * (clust + 3)));
+                uint32_t *tmp = krealloc(priv->fat, ((sizeof (uint32_t)) * (clust + 3)));
                 if (!tmp)
                     return -666;
 
