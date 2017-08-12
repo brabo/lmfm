@@ -76,8 +76,6 @@ int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *ar
 struct fnode *vfs_open(void *arg1, uint32_t arg2);
 int vfs_read(struct fnode *fno, void *buf, int len);
 int vfs_seek(struct fnode *fno, int off, int whence);
-
-
-
+int vfs_touch(char *path);
 
 #endif

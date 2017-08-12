@@ -72,6 +72,7 @@ struct fatfs_dir {
 
 int print_array(uint8_t *buf, int len);
 int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg);
+int fatfs_open(char *path, uint32_t flags);
 int fatfs_create(struct fnode *fno);
 int fatfs_read(struct fnode *fno, void *buf, unsigned int len);
 int fatfs_write(struct fnode *fno, const void *buf, unsigned int len);

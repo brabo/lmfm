@@ -542,14 +542,21 @@ struct fnode *vfs_open(void *arg1, uint32_t arg2)
     struct fnode *f;
     uint32_t flags = arg2;
     char path[MAX_FILE];
+    char ppath[MAX_FILE];
     int ret;
 
     path_abs(rel_path, path, MAX_FILE);
 
     f = fno_search(path);
     if (f) {
-        //fatfs_open(...)
-        return f;
+        if (!fatfs_open(path, flags))
+            return f;
+    }
+
+    f = fno_create_file(path);
+    if (f) {
+        if (!fatfs_create(f))
+            return f;
     }
 
     return NULL;

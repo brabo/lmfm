@@ -243,11 +243,6 @@ void vfs_cat(char *path)
 {
     printf("\nC:\\CAT %s\n", path);
 
-    struct fatfs_dir dj;
-    char fname[13];
-    memset(fname, 0x00, 13);
-    dj.fn = fname;
-
     struct fnode *fno = vfs_open(path, O_RDONLY);
 
     uint8_t *buf = malloc((fno->size + 1) * sizeof (uint8_t));
@@ -266,11 +261,6 @@ void vfs_cat(char *path)
 void vfs_fuzz(char *path)
 {
     printf("\nC:\\FUZZ %s\n", path);
-
-    struct fatfs_dir dj;
-    char fname[13];
-    memset(fname, 0x00, 13);
-    dj.fn = fname;
 
     struct fnode *fno = vfs_open(path, O_RDONLY);
 
@@ -297,4 +287,20 @@ void vfs_fuzz(char *path)
     printf("If you see me, we did not crash!\n\n");
 
     fatfs_close(fno);
+}
+
+int vfs_touch(char *path)
+{
+    if (!path)
+        return -1;
+
+    printf("C:\\TOUCH %s\n", path);
+
+    struct fnode *fno = vfs_open(path, O_RDONLY);
+    if (fno)
+        fatfs_close(fno);
+    else
+        printf("NO FNO!\n");
+
+    return 0;
 }

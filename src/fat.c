@@ -255,6 +255,7 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
     }
 
     disk_read(fsd, fs->win, (dj->sect), 0, fs->bps);
+    print_array(fs->win, fs->bps);
 
     /* have to check cluster borders! */
     while (2 > 1) {
@@ -362,6 +363,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 
         struct fnode *newdir;
 
+        printf("Found file %s\n", dj.fn);
         if (dj.attr & AM_DIR)
             newdir = fno_mkdir(NULL, dj.fn, parent);
         else
@@ -524,6 +526,78 @@ fail:
     return -1;
 }
 
+int fatfs_open(char *path, uint32_t flags)
+{
+    struct fnode *fno;
+    fno = fno_search(path);
+    if (!fno)
+        return -1;
+
+    fno->off = 0;
+
+    return 0;
+}
+
+static int dir_find(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
+{
+    if (!fsd || !dj || !path)
+        return -1;
+
+    while (dir_read(fsd, dj) == 0) {
+        if (!strncmp(dj->fn, path, 12)) {
+            dj->off -= 32;
+            uint32_t fat = get_fat(fsd, dj->sclust);
+            dj->sect = CLUST2SECT(fsd->fs, dj->sclust);
+            dj->cclust = dj->sclust;
+            //dj->foff = 0;
+            return 0;
+        }
+    }
+
+    return -2;
+}
+
+static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
+{
+    int res;
+
+    if (!strncmp(path, "/mnt", 4))
+        path += 4;
+
+    while (*path == ' ')
+        path++;
+
+    if (*path == '/')
+        path++;
+
+    dj->cclust = 0;
+
+    res = dir_rewind(fsd->fs, dj);
+    if (*path < ' ') {
+        dj->off = 0;
+        return res;
+    }
+
+    dj->off = 0;
+
+    do {
+        char tpath[12];
+        char *tpathp = tpath;
+
+        while ((*path != '/') && (*path != ' ') && (*path != 0x00)) {
+            *tpathp++ = *path++;
+
+        }
+        *tpathp = 0x00;
+        res = dir_find(fsd, dj, tpath);
+        if (*path == '/')
+            path++;
+    } while ((*path != ' ') && (*path != 0x00));
+
+    dj->off -= 32;
+    return res;
+}
+
 int fatfs_create(struct fnode *fno)
 {
     if (!fno || !fno->parent || !fno->parent->priv)
@@ -533,7 +607,7 @@ int fatfs_create(struct fnode *fno)
         return -2;
 
     struct fatfs_dir dj;
-    char fbuf[12];
+    char fbuf[13];
     char *path = kalloc(MAXPATHLEN * sizeof (char));
 
     if (!fno || !fno->parent)
@@ -554,12 +628,8 @@ int fatfs_create(struct fnode *fno)
     dj.fn = fbuf;
     dj.off = 0;
 
-    int ret;// = follow_path(fsd, &dj, path);
-
     uint32_t clust = init_fat(fsd);
-
-    if (ret = dir_read(fsd, &dj) != -2)
-        return ret;
+    follow_path(fsd, &dj, path);
 
     while ((*path != ' ') && (*path != 0x00))
         path++;
@@ -567,7 +637,7 @@ int fatfs_create(struct fnode *fno)
         path--;
     path++;
 
-    ret = add_dir(fs, &dj, path);
+    int ret = add_dir(fs, &dj, path);
     set_clust(fs, (fs->win + dj.off), clust);
     disk_write(fsd, fs->win, dj.sect, 0, fs->bps);
 
@@ -576,8 +646,9 @@ int fatfs_create(struct fnode *fno)
     priv->off = dj.off;
     fno->off = 0;
     fno->size = 0;
+    priv->dirsect = dj.dirsect;
 
-    return ret;
+    return 0;
 }
 
 int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
