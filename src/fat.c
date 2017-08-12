@@ -765,8 +765,16 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
         if ((w_len < len) && (off == fs->bps)) {
             sect++;
             if ((sect + 1) > fs->spc) {
+                clust++;
                 uint32_t tempclus = priv->cclust;
                 priv->cclust = init_fat(fsd);
+                uint32_t *tmp = realloc(priv->fat, ((sizeof (uint32_t)) * (clust + 3)));
+                if (!tmp)
+                    return -666;
+
+                priv->fat = tmp;
+
+                priv->fat[clust] = priv->cclust;
                 set_fat(fsd, tempclus, priv->cclust);
                 priv->sect = CLUST2SECT(fs, priv->cclust);
                 sect = 0;
