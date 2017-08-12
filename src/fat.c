@@ -112,9 +112,12 @@ static void st_dword(uint8_t *ptr, uint32_t val)    /* Store a 4-byte word in li
 
 static int check_fs(struct fatfs_disk *fsd)
 {
+    if (!fsd)
+        return -1;
+
     struct fatfs *fs = fsd->fs;
     if (LD_WORD(fs->win + BS_55AA) != 0xAA55) {
-        return -1;
+        return -2;
     }
 
     if (fs->win[BS_JMPBOOT] == 0xE9 || (fs->win[BS_JMPBOOT] == 0xEB && fs->win[BS_JMPBOOT + 2] == 0x90)) {
@@ -126,15 +129,18 @@ static int check_fs(struct fatfs_disk *fsd)
         }
     }
 
-    return -2;
+    return -3;
 }
 
 static int get_fat(struct fatfs_disk *fsd, int clust)
 {
+    if (!fsd)
+        return -1;
+
     struct fatfs *fs = fsd->fs;
 
     if (clust < 2 || clust >= fs->n_fatent) { /* Range check */
-        return -1;
+        return -2;
     }
 
     switch(fs->type) {
@@ -148,15 +154,18 @@ static int get_fat(struct fatfs_disk *fsd, int clust)
 
         return (LD_DWORD(fs->win + ((clust * 4) & (fs->bps - 1))) & 0x0FFFFFFF);
     }
-    return -2;
+    return -3;
 }
 
 static int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val)
 {
+    if (!fsd)
+        return -1;
+
     struct fatfs *fs = fsd->fs;
 
     if (clust < 2 || clust >= fs->n_fatent) { /* Range check */
-        return -1;
+        return -2;
     }
 
     switch(fs->type) {
@@ -172,11 +181,14 @@ static int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val)
         disk_write(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / 4))), 0, fs->bps);
         return 0;
     }
-    return -2;
+    return -3;
 }
 
 static int get_clust(struct fatfs *fs, uint8_t *dir)
 {
+    if (!fs || !dir)
+        return -1;
+
     int clst = 0;
 
     if (fs->type == FAT32) {
@@ -190,6 +202,9 @@ static int get_clust(struct fatfs *fs, uint8_t *dir)
 
 static int set_clust(struct fatfs *fs, uint8_t *dir, uint32_t clust)
 {
+    if (!fs || !dir)
+        return -1;
+
     if (fs->type == FAT32) {
         st_word((dir + DIR_SCLUST_HI), (clust >> 16));
     }
@@ -200,10 +215,13 @@ static int set_clust(struct fatfs *fs, uint8_t *dir, uint32_t clust)
 
 static int walk_fat(struct fatfs_disk *fsd)
 {
+    if (!fsd)
+        return -1;
+
     int fat;
     int clust = 2;
 
-   while (2 > 1) {
+    while (2 > 1) {
         fat = get_fat(fsd, clust);
         if (!fat)
             break;
@@ -215,6 +233,9 @@ static int walk_fat(struct fatfs_disk *fsd)
 
 static int init_fat(struct fatfs_disk *fsd)
 {
+    if (!fsd)
+        return -1;
+
     struct fatfs *fs = fsd->fs;
 
     int clust = walk_fat(fsd);
@@ -227,8 +248,11 @@ static int init_fat(struct fatfs_disk *fsd)
 
 static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
 {
-    if (dj->cclust == 1 || dj->cclust >= fs->n_fatent)
+    if (!fs || !dj)
         return -1;
+
+   if (dj->cclust == 1 || dj->cclust >= fs->n_fatent)
+        return -2;
 
     if (!dj->cclust)
         dj->sect = fs->dirbase;
@@ -302,9 +326,12 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
 
 static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
 {
+    if (!fs || !dj || !name)
+        return -1;
+
     int nlen = strlen(name);
     if (nlen > 12)
-        return -1;
+        return -2;
 
     memset((fs->win + dj->off), 0, 0x20);
     memset((fs->win + dj->off), ' ', 11);
@@ -323,7 +350,7 @@ static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
 
 static char *relative_path(struct fatfs_disk *f, char *abs)
 {
-    if (!abs)
+    if (!f || !abs)
         return NULL;
 
     return (abs + strlen(f->mountpoint->fname) + 1);
@@ -331,6 +358,9 @@ static char *relative_path(struct fatfs_disk *f, char *abs)
 
 static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 {
+    if (!f || !path)
+        return;
+
     char fbuf[13];
     struct fatfs_priv *priv;
     struct fatfs_dir dj;
@@ -411,18 +441,13 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 
 int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
 {
+    if (!source || !tgt)
+        return -1;
+
     struct fnode *tgt_dir = NULL;
     struct fnode *src_dev = NULL;
 
     struct fatfs_disk *fsd;
-
-    /* Source must NOT be NULL */
-    if (!source)
-        return -1;
-
-    /* Target must be a valid dir */
-    if (!tgt)
-        return -1;
 
     tgt_dir = fno_search(tgt);
 //    src_dev = fno_search(source);
@@ -465,7 +490,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
 
     disk_read(fsd, fs->win, fs->bsect, 0, DEFBPS);
 
-    if (check_fs(fsd) == -2) {
+    if (check_fs(fsd) == -3) {
         fs->bsect = LD_WORD(fs->win + BS_BS);
         disk_read(fsd, fs->win, fs->bsect, 0, DEFBPS);
 
@@ -526,8 +551,10 @@ fail:
 
 int fatfs_open(char *path, uint32_t flags)
 {
-    struct fnode *fno;
-    fno = fno_search(path);
+    if (!path)
+        return -1;
+
+    struct fnode *fno = fno_search(path);
     if (!fno)
         return -1;
 
@@ -556,6 +583,9 @@ static int dir_find(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
 
 static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
 {
+    if (!fsd || !dj || !path)
+        return -1;
+
     int res;
 
     if (!strncmp(path, "/mnt", 4))
@@ -605,9 +635,6 @@ int fatfs_create(struct fnode *fno)
     struct fatfs_dir dj;
     char fbuf[13];
     char *path = kalloc(MAXPATHLEN * sizeof (char));
-
-    if (!fno || !fno->parent)
-        return -1;
 
     fno_fullpath(fno, path, MAXPATHLEN);
 
@@ -767,6 +794,9 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
 
 int fatfs_seek(struct fnode *fno, int off, int whence)
 {
+    if (!fno)
+        return -1;
+
     struct fatfs_fnode *mfno;
     int new_off;
 
@@ -801,6 +831,9 @@ int fatfs_seek(struct fnode *fno, int off, int whence)
 
 int fatfs_close(struct fnode *fno)
 {
+    if (!fno)
+        return -1;
+
     fno->off = 0;
 
     return 0;
