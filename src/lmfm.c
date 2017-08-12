@@ -47,7 +47,7 @@ int main(int argc, char **argv)
 
     vfs_ls("/");
     vfs_ls("/mnt/");
-    vfs_ls("/mnt/BARDIR/");
+    vfs_ls("/mnt/BARDIR/DIR/");
     //vfs_ls("/mnt/BARDIR/DIR/");
     //vfs_cat("/mnt/BARDIR/DIR/DIR/");
 
@@ -56,10 +56,10 @@ int main(int argc, char **argv)
     //vfs_cat("/mnt/LONGLO~1");
     //vfs_fuzz("/mnt/DOOM1.WAD");
     vfs_touch("/mnt/LMFM1");
-    vfs_ls("/mnt");
+    vfs_ls("/mnt/");
 
-    vfs_touch("/mnt/BARDIR/LMFM1");
-    vfs_ls("/mnt/BARDIR");
+    vfs_touch("/mnt/BARDIR/DIR/LMFM12");
+    vfs_ls("/mnt/BARDIR/DIR/");
 
     mb_close();
 

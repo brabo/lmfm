@@ -255,7 +255,6 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
     }
 
     disk_read(fsd, fs->win, (dj->sect), 0, fs->bps);
-    print_array(fs->win, fs->bps);
 
     /* have to check cluster borders! */
     while (2 > 1) {
@@ -363,7 +362,6 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 
         struct fnode *newdir;
 
-        printf("Found file %s\n", dj.fn);
         if (dj.attr & AM_DIR)
             newdir = fno_mkdir(NULL, dj.fn, parent);
         else
@@ -549,7 +547,6 @@ static int dir_find(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
             uint32_t fat = get_fat(fsd, dj->sclust);
             dj->sect = CLUST2SECT(fsd->fs, dj->sclust);
             dj->cclust = dj->sclust;
-            //dj->foff = 0;
             return 0;
         }
     }
@@ -594,7 +591,6 @@ static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
             path++;
     } while ((*path != ' ') && (*path != 0x00));
 
-    dj->off -= 32;
     return res;
 }
 
