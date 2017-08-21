@@ -127,10 +127,9 @@ static int check_fs(struct fatfs_disk *fsd)
 
     if (fs->win[BS_JMPBOOT] == 0xE9 || (fs->win[BS_JMPBOOT] == 0xEB && fs->win[BS_JMPBOOT + 2] == 0x90)) {
 
-        if ((LD_WORD(fs->win + BS_FSTYPE)) == 0x4146) return 0;   /* Check "FAT" string */
         if ((LD_DWORD(fs->win + BS_FSTYPE32) == 0x33544146) && (*(fs->win + BS_FSTYPE32 + 4) == '2')) {
             fs->type = FAT32;
-            return 0;            /* Check "FAT3" string */
+            return 0;
         }
     }
 
@@ -152,8 +151,7 @@ static int get_fat(struct fatfs_disk *fsd, int clust)
     case FAT12:
         break;
     case FAT16:
-        if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / 2))), 0, fs->bps) < 0) break;
-        return LD_WORD(fs->win + (clust * 2));
+        break;
     case FAT32:
         if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / FATENT_SIZE))), 0, fs->bps) < 0) break;
 
@@ -177,8 +175,6 @@ static int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val)
     case FAT12:
         break;
     case FAT16:
-        //if (mb_read(fs->fd, fs->win, 0, (fs->fatbase + (clust / (fs->bps / 2))) * fs->bps, fs->bps)) break;
-        //return LD_WORD(fs->win + (clust * 2));
         break;
     case FAT32:
         if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / FATENT_SIZE))), 0, fs->bps) < 0) break;
@@ -271,8 +267,6 @@ static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
 
 static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
 {
-    /* the dir_read logic needs refactoring.
-        for one it sucks we have to -= 32 the offset in populate */
     if (!fsd || !dj)
         return -1;
 
@@ -692,7 +686,6 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
 
     int r_len = 0, sect = 0, off = 0, clust = 0;
 
-    /* calculate where to put sect and off! */
     off = fno->off;
     sect = off / fs->bps;
     off = off & (fs->bps - 1);
@@ -745,7 +738,6 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
 
     int w_len = 0, sect = 0, off = 0, clust = 0, tmpclust = 0;
 
-    /* calculate where to put sect and off! */
     off = fno->off;
     sect = off / fs->bps;
     off = off & (fs->bps - 1);
