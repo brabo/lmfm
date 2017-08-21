@@ -600,7 +600,7 @@ static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
 
     res = dir_rewind(fsd->fs, dj);
     if (*path < ' ') {
-        dj->off = 0;
+        dj->off = 0 - DIRENT_SIZE;
         return res;
     }
 
