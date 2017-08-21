@@ -62,12 +62,13 @@ int main(int argc, char **argv)
     vfs_ls("/mnt/BARDIR/");
 
     //char *buf = "BARDIR/GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
-    uint8_t *buf = malloc(10240 * sizeof (uint8_t));
-    memset(buf, 'Z', 10240);
-    mk_file("/mnt/BARDIR/ARR", buf, 10240);
+    //uint8_t *buf = malloc(4096 * sizeof (uint8_t));
+    //memset(buf, 'Z', 4096);
+    //mk_file("/mnt/BARDIR/BRR", buf, 4096);
     vfs_cat("/mnt/GRR");
     vfs_cat("/mnt/BARDIR/GRR");
     vfs_cat("/mnt/BARDIR/ARR");
+    vfs_cat("/mnt/BARDIR/BRR");
     vfs_ls("/mnt/");
 
     mb_close();

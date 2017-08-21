@@ -1,6 +1,6 @@
 CC=gcc
 
-CFLAGS=-I. --std=gnu99 -I./include -fms-extensions -fsanitize=address -m32 -ggdb -pg
+CFLAGS=-I. --std=gnu99 -I./include -fms-extensions -fsanitize=address -m32 -O0 -ggdb3 -pg
 
 LMFM_OBJ=src/mockblock.o src/vfs.o src/fat.o src/binutils.o src/lmfm.o
 

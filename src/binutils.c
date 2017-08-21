@@ -170,10 +170,14 @@ void vfs_cat(char *path)
 
     struct fnode *fno = vfs_open(path, O_RDONLY);
 
+    if (!fno)
+        return;
     uint8_t *buf = malloc((fno->size + 1) * sizeof (uint8_t));
     memset(buf, 0, (fno->size + 1));
     int res = vfs_read(fno, buf, fno->size);
 
+    if (!res)
+        return;
     while (2 > 1) {
         if (!*buf)
             break;

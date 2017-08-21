@@ -38,18 +38,15 @@ struct fatfs_dir {
     uint32_t    sclust;
     uint32_t    cclust;
     uint32_t    sect;
-    uint32_t    off;
+    int    off;
     uint32_t    dirsect;
     uint32_t    attr;
     uint32_t    fsize;
 };
 
-/* Constants */
-
-/* move to limits.h ? */
-#define MAXPATHLEN 256
+#define PATHN_MAX 256
+#define SFN_MAX     12
 #define ARG_MAX    32
-
 
 /* open */
 #define O_RDONLY 0x00
@@ -63,7 +60,6 @@ struct fatfs_dir {
 #define O_TRUNC     000010000
 #define O_APPEND    000020000
 #define O_NONBLOCK  000040000
-
 
 /* seek */
 #define SEEK_SET 0
