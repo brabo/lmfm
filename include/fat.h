@@ -30,6 +30,7 @@ struct fatfs {
     uint32_t    fatbase;
     uint32_t    dirbase;
     uint32_t    n_fatent;
+    uint32_t    nclusts;
     uint8_t     mounted;
 };
 
@@ -74,5 +75,10 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len);
 int fatfs_write(struct fnode *fno, const void *buf, unsigned int len);
 int fatfs_seek(struct fnode *fno, int off, int whence);
 int fatfs_close(struct fnode *fno);
+
+// for frag
+int get_fat(struct fatfs_disk *fsd, int clust);
+int set_clust(struct fatfs *fs, uint8_t *dir, uint32_t clust);
+int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val);
 
 #endif

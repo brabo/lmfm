@@ -137,7 +137,7 @@ static int check_fs(struct fatfs_disk *fsd)
     return -EMEDIUMTYPE;
 }
 
-static int get_fat(struct fatfs_disk *fsd, int clust)
+int get_fat(struct fatfs_disk *fsd, int clust)
 {
     if (!fsd)
         return -EINVAL;
@@ -161,7 +161,7 @@ static int get_fat(struct fatfs_disk *fsd, int clust)
     return -EMEDIUMTYPE;
 }
 
-static int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val)
+int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val)
 {
     if (!fsd)
         return -EINVAL;
@@ -202,7 +202,7 @@ static int get_clust(struct fatfs *fs, uint8_t *dir)
     return clst;
 }
 
-static int set_clust(struct fatfs *fs, uint8_t *dir, uint32_t clust)
+int set_clust(struct fatfs *fs, uint8_t *dir, uint32_t clust)
 {
     if (!fs || !dir)
         return -EINVAL;
@@ -501,7 +501,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
 
     uint8_t num_fats = 0;
     uint16_t root_ents = 0, rsvd_sec = 0;
-    uint32_t root_secs = 0, fatsz = 0, totsec = 0, datasec = 0, nclusts = 0;
+    uint32_t root_secs = 0, fatsz = 0, totsec = 0, datasec = 0;
 
     fs->bps = LD_WORD(fs->win + BPB_BPS);
     fs->spc = fs->win[BPB_SPC];
@@ -523,19 +523,19 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
         totsec = LD_DWORD(fs->win + BPB_TOTSEC32);
 
     datasec = totsec - (rsvd_sec + (num_fats * fatsz) + root_secs);
-    nclusts = datasec / fs->spc;
+    fs->nclusts = datasec / fs->spc;
     fs->fatbase = rsvd_sec + fs->bsect;
     fs->dirbase = CLUST2SECT(fs, LD_DWORD(fs->win + BPB_ROOTCLUS));
 
     /* FAT type determination */
-    if (nclusts < 4085)
+    if (fs->nclusts < 4085)
         fs->type = FAT12;
-    else if (nclusts < 65525)
+    else if (fs->nclusts < 65525)
         fs->type = FAT16;
     else
         fs->type = FAT32;
 
-    fs->n_fatent = nclusts + 2;
+    fs->n_fatent = fs->nclusts + 2;
 
     fatfs_populate(fsd, "", 0);
     fs->mounted = 1;
