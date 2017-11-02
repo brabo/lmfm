@@ -29,6 +29,21 @@
 #include "fat.h"
 #include "vfs.h"
 
+struct fatfs {
+    int         fd;
+    uint8_t     win[512];
+    uint32_t    bsect;
+    uint8_t     type;
+    uint16_t    bps;
+    uint8_t     spc;
+    uint32_t    database;
+    uint32_t    fatbase;
+    uint32_t    dirbase;
+    uint32_t    n_fatent;
+    uint32_t    nclusts;
+    uint8_t     mounted;
+};
+
 int mount(struct fatfs *fs)
 {
     printf("\nC:\\MOUNT /dev/sd0 /mnt\n");

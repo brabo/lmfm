@@ -3,49 +3,6 @@
 
 #include "vfs.h"
 
-struct fatfs_disk {
-    struct fnode *blockdev;
-    struct fnode *mountpoint;
-    struct fatfs *fs;
-};
-
-struct fatfs_priv {
-    uint32_t            sclust;
-    uint32_t            cclust;
-    uint32_t            sect;
-    uint32_t            off;
-    uint32_t            dirsect;
-    struct fatfs_disk   *fsd;
-    uint32_t            *fat;
-    uint32_t            flags;
-};
-
-struct fatfs {
-    int         fd;
-    uint8_t     win[512];
-    uint32_t    bsect;
-    uint8_t     type;
-    uint16_t    bps;
-    uint8_t     spc;
-    uint32_t    database;
-    uint32_t    fatbase;
-    uint32_t    dirbase;
-    uint32_t    n_fatent;
-    uint32_t    nclusts;
-    uint8_t     mounted;
-};
-
-struct fatfs_dir {
-    uint8_t     *fn;
-    uint32_t    sclust;
-    uint32_t    cclust;
-    uint32_t    sect;
-    int    off;
-    uint32_t    dirsect;
-    uint32_t    attr;
-    uint32_t    fsize;
-};
-
 #define PATHN_MAX 256
 #define SFN_MAX     12
 #define ARG_MAX    32
@@ -68,18 +25,12 @@ struct fatfs_dir {
 #define SEEK_CUR 1
 #define SEEK_END 2
 
-int print_array(uint8_t *buf, int len);
 int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg);
-int fatfs_open(char *path, uint32_t flags);
-int fatfs_create(struct fnode *fno);
+int fatfs_open(const char *path, int flags);
+int fatfs_creat(struct fnode *fno);
 int fatfs_read(struct fnode *fno, void *buf, unsigned int len);
 int fatfs_write(struct fnode *fno, const void *buf, unsigned int len);
 int fatfs_seek(struct fnode *fno, int off, int whence);
 int fatfs_close(struct fnode *fno);
-
-// for frag
-int get_fat(struct fatfs_disk *fsd, int clust);
-int set_clust(struct fatfs *fs, uint8_t *dir, uint32_t clust);
-int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val);
 
 #endif

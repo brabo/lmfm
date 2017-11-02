@@ -27,6 +27,7 @@
 #include <dirent.h>
 #include "fat.h"
 #include "vfs.h"
+#include "frosted.h"
 
 #define P_EXEC     0000001   // exec
 
@@ -555,7 +556,7 @@ struct fnode *vfs_open(void *arg1, uint32_t arg2)
 
     f = fno_create_file(path);
     if (f) {
-        if (!fatfs_create(f))
+        if (!fatfs_creat(f))
             return f;
     }
 
@@ -577,6 +578,14 @@ int vfs_seek(struct fnode *fno, int off, int whence)
     return fatfs_seek(fno, off, whence);
 }
 
+/* Frosted device driver hook */
+static struct module mod_sdio;
+struct dev_sd {
+    struct device * dev;
+};
+
+struct dev_sd SdCard[1]; /* Multiple slots? Make this array bigger */
+
 void vfs_init(void)
 {
     struct fnode *dev = NULL;
@@ -590,6 +599,14 @@ void vfs_init(void)
 
     /* Init "/dev" dir */
     dev = fno_mkdir(NULL, "dev", NULL);
+    char name[4] = "sd0";
+    mod_sdio.ops.block_read = mb_read;
+    mod_sdio.ops.block_write = mb_write;
+    fno_create(&mod_sdio, name, dev);
+
+//    memset(&SdCard[0], 0, sizeof(struct dev_sd));
+    printf("Found SD card in microSD slot.\r\n");
+//    SdCard[0].dev = device_fno_init(&mod_sdio, name, dev, FL_BLK, &SdCard[0]);
 
     /* Init "/sys" dir */
     dev = fno_mkdir(NULL, "sys", NULL);

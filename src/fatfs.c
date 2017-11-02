@@ -19,44 +19,65 @@
  *
  */
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include "fat.h"
-#include "vfs.h"
-#include "mockblock.h"
+#include "string.h"
+#include "frosted.h"
 
-int print_array(uint8_t *buf, int len)
-{
-    char *bugger = malloc(sizeof(uint8_t) * ((len * 2) + 3));
-    char *ptr = bugger;
-    uint8_t *ptr2 = buf;
-    sprintf(ptr++, "[");
+static struct module mod_fatfs = { };
 
-    for (int i = 0; i < len; i++) {
-        sprintf(ptr, "%02X", *ptr2++);
-        ptr += 2;
-    }
+struct fatfs_disk {
+    struct fnode *blockdev;
+    struct fnode *mountpoint;
+    struct fatfs *fs;
+};
 
-    sprintf(ptr++, "]");
-    printf("Read sector: %s\n", bugger);
+struct fatfs_priv {
+    uint32_t            sclust;
+    uint32_t            cclust;
+    uint32_t            sect;
+    uint32_t            off;
+    uint32_t            dirsect;
+    struct fatfs_disk   *fsd;
+    uint32_t            *fat;
+    uint32_t            flags;
+};
 
-    free(bugger);
+struct fatfs {
+    int         fd;
+    uint8_t     win[512];
+    uint32_t    bsect;
+    uint8_t     type;
+    uint16_t    bps;
+    uint8_t     spc;
+    uint32_t    database;
+    uint32_t    fatbase;
+    uint32_t    dirbase;
+    uint32_t    n_fatent;
+    uint32_t    nclusts;
+    uint8_t     mounted;
+};
 
-    return 0;
-}
+struct fatfs_dir {
+    uint8_t     *fn;
+    uint32_t    sclust;
+    uint32_t    cclust;
+    uint32_t    sect;
+    uint32_t    off;
+    uint32_t    dirsect;
+    uint32_t    attr;
+    uint32_t    fsize;
+};
 
-#define kalloc(s) malloc(s)
-#define kcalloc(n,s) calloc(s,n)
-#define krealloc(p,s) realloc(p,s)
-#define kfree(p) free(p)
-#define task_filedesc_add(f) 3
+#ifdef CONFIG_FAT32
+# define FATFS_FAT32    1   /* Enable FAT32 */
+#endif
 
 /* Macro proxies for disk operations */
-#define disk_read(f,b,s,o,l) mb_read(f->blockdev,b,s,o,l)
-#define disk_write(f,b,s,o,l) mb_write(f->blockdev,b,s,o,l)
+//#define disk_read(f,b,s,o,l) mb_read(f->blockdev,b,s,o,l)
+//#define disk_write(f,b,s,o,l) mb_write(f->blockdev,b,s,o,l)
+/* Macro proxies for disk operations */
+#define disk_read(f,b,s,o,l) f->blockdev->owner->ops.block_read(f->blockdev,b,s,o,l)
+#define disk_write(f,b,s,o,l) f->blockdev->owner->ops.block_write(f->blockdev,b,s,o,l)
 
 #define BS_JMPBOOT      0
 #define BPB_BPS         11
@@ -451,19 +472,19 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
     struct fatfs_disk *fsd;
 
     tgt_dir = fno_search(tgt);
-//    src_dev = fno_search(source);
+    src_dev = fno_search(source);
 
     if (!tgt_dir)
         return -ENOENT;
      if ((tgt_dir->flags & FL_DIR) == 0)
         return -ENOTDIR;
 
-//    if (!src_dev || !(src_dev ->owner)
+    if (!src_dev || !(src_dev ->owner)
             //|| ((src_dev->flags & FL_BLK) == 0)
-//            ) {
+            ) {
         /* Invalid block device. */
-//        return -ENOENT;
-//    }
+        return -ENOENT;
+    }
 
     /* Initialize file system to disk association */
     fsd = kcalloc(sizeof(struct fatfs_disk), 1);
@@ -550,7 +571,7 @@ fail:
     return -ENOMEDIUM;
 }
 
-int fatfs_open(char *path, uint32_t flags)
+int fatfs_open(const char *path, int flags)
 {
     if (!path)
         return -EINVAL;
@@ -634,7 +655,7 @@ static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
     return res;
 }
 
-int fatfs_create(struct fnode *fno)
+int fatfs_creat(struct fnode *fno)
 {
     if (!fno || !fno->parent || !fno->parent->priv)
         return -EINVAL;
@@ -717,7 +738,7 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
         if (fno->off + r > fno->size)
             r = fno->size - fno->off;
 
-        disk_read(fsd, (buf + r_len), (priv->sect + sect), off, r);
+        disk_read(fsd, ((uint8_t *)buf + r_len), (priv->sect + sect), off, r);
 
         r_len += r;
         fno->off += r;
@@ -856,3 +877,28 @@ int fatfs_close(struct fnode *fno)
 
     return 0;
 }
+
+int fatfs_init(void)
+{
+    mod_fatfs.family = FAMILY_FILE;
+    strcpy(mod_fatfs.name,"fatfs");
+
+    mod_fatfs.mount = fatfs_mount;
+    mod_fatfs.ops.open = fatfs_open;
+    mod_fatfs.ops.creat = fatfs_creat;
+    mod_fatfs.ops.read = fatfs_read;
+    mod_fatfs.ops.write = fatfs_write;
+    mod_fatfs.ops.seek = fatfs_seek;
+    mod_fatfs.ops.close = fatfs_close;
+    //mod_fatfs.ops.poll = fatfs_poll;
+
+    /*
+    mod_fatfs.ops.unlink = fatfs_unlink;
+    mod_fatfs.ops.exe = fatfs_exe;
+    */
+
+    register_module(&mod_fatfs);
+    return 0;
+}
+
+
