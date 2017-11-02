@@ -17,6 +17,7 @@ struct fatfs_priv {
     uint32_t            dirsect;
     struct fatfs_disk   *fsd;
     uint32_t            *fat;
+    uint32_t            flags;
 };
 
 struct fatfs {

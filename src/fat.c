@@ -558,6 +558,9 @@ int fatfs_open(char *path, uint32_t flags)
     if (!fno)
         return -ENOENT;
 
+    struct fatfs_priv *priv = (struct fatfs_priv *)fno->priv;
+    priv->flags = flags;
+
     if (flags & O_APPEND) {
         fno->off = fno->size;
     } else {
@@ -743,7 +746,7 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
 
     int w_len = 0, sect = 0, off = 0, clust = 0;
 
-    if (fno->flags & O_APPEND) {
+    if (priv->flags & O_APPEND) {
         off = fno->size;
     } else {
         off = fno->off;
