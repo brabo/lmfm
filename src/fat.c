@@ -558,7 +558,11 @@ int fatfs_open(char *path, uint32_t flags)
     if (!fno)
         return -ENOENT;
 
-    fno->off = 0;
+    if (flags & O_APPEND) {
+        fno->off = fno->size;
+    } else {
+        fno->off = 0;
+    }
 
     return 0;
 }
@@ -739,7 +743,12 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
 
     int w_len = 0, sect = 0, off = 0, clust = 0;
 
-    off = fno->off;
+    if (fno->flags & O_APPEND) {
+        off = fno->size;
+    } else {
+        off = fno->off;
+    }
+
     sect = off / fs->bps;
     off = off & (fs->bps - 1);
     clust = sect / fs->spc;
