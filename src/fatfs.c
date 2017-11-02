@@ -1,20 +1,18 @@
 /*
- *      fat.c: a linux userspace fatfs driver to operate on
- *                      dd images files through mockblock.
+ *      This file is part of frosted.
  *
- *      This is free software: you can redistribute it and/or modify
+ *      frosted is free software: you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License version 2, as
  *      published by the Free Software Foundation.
  *
  *
- *      This is distributed in the hope that it will be useful,
+ *      frosted is distributed in the hope that it will be useful,
  *      but WITHOUT ANY WARRANTY; without even the implied warranty of
  *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *      GNU General Public License for more details.
  *
  *      You should have received a copy of the GNU General Public License
  *      along with frosted.  If not, see <http://www.gnu.org/licenses/>.
- *
  *      Authors: brabo
  *
  */
@@ -72,9 +70,10 @@ struct fatfs_dir {
 # define FATFS_FAT32    1   /* Enable FAT32 */
 #endif
 
-/* Macro proxies for disk operations */
-//#define disk_read(f,b,s,o,l) mb_read(f->blockdev,b,s,o,l)
-//#define disk_write(f,b,s,o,l) mb_write(f->blockdev,b,s,o,l)
+#ifndef FATFS_FAT32
+# define FATFS_FAT32 0
+#endif
+
 /* Macro proxies for disk operations */
 #define disk_read(f,b,s,o,l) f->blockdev->owner->ops.block_read(f->blockdev,b,s,o,l)
 #define disk_write(f,b,s,o,l) f->blockdev->owner->ops.block_write(f->blockdev,b,s,o,l)
