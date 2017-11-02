@@ -98,7 +98,7 @@ int mb_init(char *mb_name)
         return -1;
 
     fd = open(mb_name, O_RDWR);
-    if (fd < 0) {
+    if (fd == -1) {
         perror("mb_init: open: ");
         return -2;
     }

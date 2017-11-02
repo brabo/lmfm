@@ -29,58 +29,7 @@
 #include "fat.h"
 #include "vfs.h"
 
-
-/*
-int mk_file(struct fatfs *fs, char *path, uint8_t *buf, int len)
-{
-    if (!fs || !path)
-        return -1;
-
-    printf("C:\\CP MEM %s\n", path);
-
-    struct fatfs_dir dj;
-    char fname[13];
-    memset(fname, 0x00, 13);
-    dj.fn = fname;
-
-    int res = fat_open(fs, &dj, path);
-    if (res)
-        return res;
-
-    res = fat_write(fs, &dj, buf, len);
-
-    return res;
-}
-
-int edit_file(struct fatfs *fs, char *path)
-{
-    if (!fs || !path)
-        return -1;
-
-    printf("C:\\VI %s\n", path);
-
-    struct fatfs_dir dj;
-    char fname[13];
-    memset(fname, 0x00, 13);
-    dj.fn = fname;
-
-    int res = fat_open(fs, &dj, path);
-    if (res)
-        return res;
-
-    uint8_t buf[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
-    uint8_t buf2[4] = { 0x42, 0x42, 0x42, 0x42 };
-
-    res = fat_lseek(fs, &dj, (5096 + 256));
-    res = fat_write(fs, &dj, buf, 4);
-    res = fat_lseek(fs, &dj, (5096 + 256));
-    res = fat_read(fs, &dj, buf2, 4);
-    printf("Found 0x%02X%02X%02X%02X\n", buf2[0], buf2[1], buf2[2], buf2[3]);
-
-    return res;
-}
-*/
-int vfs_mount_fat(struct fatfs *fs)
+int mount(struct fatfs *fs)
 {
     printf("\nC:\\MOUNT /dev/sd0 /mnt\n");
 
@@ -92,7 +41,7 @@ int vfs_mount_fat(struct fatfs *fs)
     return 0;
 }
 
-int vfs_ls(char *path)
+int ls(char *path)
 {
     printf("\nC:\\LS %s\n", path);
 
@@ -164,7 +113,7 @@ int vfs_ls(char *path)
     return 0;
 }
 
-void vfs_cat(char *path)
+void cat(char *path)
 {
     printf("\nC:\\CAT %s\n", path);
 
@@ -187,7 +136,7 @@ void vfs_cat(char *path)
     fatfs_close(fno);
 }
 
-void vfs_fuzz(char *path)
+void fuzz(char *path)
 {
     printf("\nC:\\FUZZ %s\n", path);
 
@@ -218,7 +167,7 @@ void vfs_fuzz(char *path)
     fatfs_close(fno);
 }
 
-int vfs_touch(char *path)
+int touch(char *path)
 {
     if (!path)
         return -1;
@@ -246,6 +195,34 @@ int mk_file(char *path, uint8_t *buf, int len)
         return -2;
 
     int res = vfs_write(fno, buf, len);
+
+    fatfs_close(fno);
+
+    return res;
+}
+
+int edit_file(char *path)
+{
+    if (!path)
+        return -1;
+
+    printf("C:\\VI %s\n", path);
+
+    struct fnode *fno = vfs_open(path, O_RDWR);
+
+    if (!fno)
+        return -2;
+
+    uint8_t buf[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+    uint8_t buf2[4] = { 0x42, 0x42, 0x42, 0x42 };
+
+    int res;
+    res = vfs_seek(fno, (5096 + 256), SEEK_SET);
+    res = vfs_write(fno, buf, 4);
+    res = vfs_seek(fno, (5096 + 256), SEEK_SET);
+    res = vfs_read(fno, buf2, 4);
+
+    printf("Found 0x%02X%02X%02X%02X\n", buf2[0], buf2[1], buf2[2], buf2[3]);
 
     fatfs_close(fno);
 

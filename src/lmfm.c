@@ -31,8 +31,11 @@ int main(int argc, char **argv)
     struct fatfs *fs = malloc(1 * sizeof (struct fatfs));
     fs->bsect = 0;
 
-    if (argc != 2)
+    if (argc != 2) {
+        printf("Usage: %s image\n", argv[0]);
         exit(1);
+    }
+
 
     fs->fd = mb_init(argv[1]);
 
@@ -40,36 +43,21 @@ int main(int argc, char **argv)
         exit(2);
 
     vfs_init();
-    vfs_ls("/");
-    vfs_ls("/mnt/");
+    ls("/");
+    ls("/mnt/");
 
-    vfs_mount_fat(fs);
+    mount(fs);
 
-    vfs_ls("/");
-    vfs_ls("/mnt/");
-    vfs_ls("/mnt/BARDIR/");
-    //vfs_ls("/mnt/BARDIR/DIR/");
-    //vfs_cat("/mnt/BARDIR/DIR/DIR/");
+    ls("/");
+    ls("/mnt/");
+    ls("/mnt/BARDIR/");
 
-    //edit_file(fs, "/GRR");
-    //vfs_cat("/mnt/FOO");
-    //vfs_cat("/mnt/LONGLO~1");
-    //vfs_fuzz("/mnt/DOOM1.WAD");
-    vfs_touch("/mnt/LMFM1");
-    vfs_ls("/mnt/");
-
-    vfs_touch("/mnt/BARDIR/LMFM42");
-    vfs_ls("/mnt/BARDIR/");
-
-    //char *buf = "BARDIR/GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
-    //uint8_t *buf = malloc(4096 * sizeof (uint8_t));
-    //memset(buf, 'Z', 4096);
-    //mk_file("/mnt/BARDIR/BRR", buf, 4096);
-    vfs_cat("/mnt/GRR");
-    vfs_cat("/mnt/BARDIR/GRR");
-    vfs_cat("/mnt/BARDIR/ARR");
-    vfs_cat("/mnt/BARDIR/BRR");
-    vfs_ls("/mnt/");
+    //char *buf = "GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
+    //uint8_t *buf = malloc(14096 * sizeof (uint8_t));
+    //memset(buf, 'Z', 14096);
+    //mk_file("/mnt/ZRR", buf, 14096);
+    edit_file("/mnt/ZRR");
+    cat("/mnt/ZRR");
 
     mb_close();
 
