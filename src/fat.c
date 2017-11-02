@@ -52,6 +52,7 @@ int print_array(uint8_t *buf, int len)
 #define kcalloc(n,s) calloc(s,n)
 #define krealloc(p,s) realloc(p,s)
 #define kfree(p) free(p)
+#define task_filedesc_add(f) 3
 
 /* Macro proxies for disk operations */
 #define disk_read(f,b,s,o,l) mb_read(f->blockdev,b,s,o,l)
@@ -567,7 +568,9 @@ int fatfs_open(char *path, uint32_t flags)
         fno->off = 0;
     }
 
-    return 0;
+    int ret = task_filedesc_add(fno);
+
+    return ret;
 }
 
 static int dir_find(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)

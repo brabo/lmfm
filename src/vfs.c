@@ -549,7 +549,7 @@ struct fnode *vfs_open(void *arg1, uint32_t arg2)
 
     f = fno_search(path);
     if (f) {
-        if (!fatfs_open(path, flags))
+        if (fatfs_open(path, flags))
             return f;
     }
 

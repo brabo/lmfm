@@ -55,9 +55,9 @@ int main(int argc, char **argv)
     //char *buf = "GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
     //uint8_t *buf = malloc(14096 * sizeof (uint8_t));
     //memset(buf, 'Z', 14096);
-    //mk_file("/mnt/ZRR", buf, 14096);
-    edit_file("/mnt/ZRR");
-    cat("/mnt/ZRR");
+    //mk_file("/mnt/GRR", buf, 14096);
+    //edit_file("/mnt/ZRR");
+    cat("/mnt/GRR");
 
     mb_close();
 
