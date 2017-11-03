@@ -67,7 +67,7 @@ struct fatfs_dir {
 };
 
 #ifdef CONFIG_FAT32
-# define FATFS_FAT32    1   /* Enable FAT32 */
+# define FATFS_FAT32    1
 #endif
 
 #ifndef FATFS_FAT32
@@ -78,7 +78,7 @@ struct fatfs_dir {
 #define disk_read(f,b,s,o,l) f->blockdev->owner->ops.block_read(f->blockdev,b,s,o,l)
 #define disk_write(f,b,s,o,l) f->blockdev->owner->ops.block_write(f->blockdev,b,s,o,l)
 
-#define BS_JMPBOOT      0
+/* BIOS Parameter Block */
 #define BPB_BPS         11
 #define BPB_SPC         13
 #define BPB_RSVD_SEC    14
@@ -89,6 +89,9 @@ struct fatfs_dir {
 #define BPB_TOTSEC32    32
 #define BPB_FATSz32     36
 #define BPB_ROOTCLUS    44
+
+/* Boot sector */
+#define BS_JMPBOOT      0
 #define BS_FSTYPE       54
 #define BS_FSTYPE32     82
 #define BS_MBR          446
@@ -98,20 +101,22 @@ struct fatfs_dir {
 #define DEFBPS          512
 #define FAT_SIG         0xAA55
 
+/* Directory entries */
 #define DIR_NAME        0
 #define DIR_ATTR        11
 #define DIR_SCLUST_HI   20
 #define DIR_SCLUST_LO   26
 #define DIR_FSIZE       28
 
-#define AM_DIR  0x10    /* Directory */
+#define AM_DIR  0x10
 
 #define FAT12   1
 #define FAT16   2
 #define FAT32   3
 #define EOC32   0x0FFFFFF8
-#define DDEM                0xE5    /* Deleted directory entry mark */
+#define DDEM    0xE5
 
+/* Entry sizes in bytes */
 #define FATENT_SIZE  4
 #define DIRENT_SIZE  0x20
 
@@ -838,12 +843,7 @@ int fatfs_seek(struct fnode *fno, int off, int whence)
     if (!fno)
         return -EINVAL;
 
-    struct fatfs_fnode *mfno;
     int new_off;
-
-//    mfno = FNO_MOD_PRIV(fno, &mod_fatfs);
-//    if (!mfno)
-//        return -1;
 
     switch (whence) {
         case SEEK_CUR:
@@ -928,12 +928,6 @@ int fatfs_init(void)
     mod_fatfs.ops.truncate = fatfs_truncate;
     mod_fatfs.ops.close = fatfs_close;
     mod_fatfs.ops.unlink = fatfs_unlink;
-    //mod_fatfs.ops.poll = fatfs_poll;
-
-    /*
-
-    mod_fatfs.ops.exe = fatfs_exe;
-    */
 
     register_module(&mod_fatfs);
     return 0;
