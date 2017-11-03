@@ -867,6 +867,26 @@ int fatfs_seek(struct fnode *fno, int off, int whence)
     return fno->off;
 }
 
+int fatfs_truncate(struct fnode *fno, unsigned int len)
+{
+    if (!fno)
+        return -EINVAL;
+
+    int new_size;
+
+    new_size = len;
+
+    if (new_size < 0)
+        new_size = 0;
+
+    if (new_size > fno->size)
+        return -ESPIPE;
+
+    fno->size = new_size;
+
+    return 0;
+}
+
 int fatfs_close(struct fnode *fno)
 {
     if (!fno)
@@ -888,6 +908,7 @@ int fatfs_init(void)
     mod_fatfs.ops.read = fatfs_read;
     mod_fatfs.ops.write = fatfs_write;
     mod_fatfs.ops.seek = fatfs_seek;
+    mod_fatfs.ops.truncate = fatfs_truncate;
     mod_fatfs.ops.close = fatfs_close;
     //mod_fatfs.ops.poll = fatfs_poll;
 
