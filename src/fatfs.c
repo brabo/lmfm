@@ -362,7 +362,7 @@ static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
         *(fs->win + dj->off + len) = name[len++];
     }
 
-    *(fs->win + dj->off + DIR_ATTR) = 0x20;
+    *(fs->win + dj->off + DIR_ATTR) = DIRENT_SIZE;
     st_dword((fs->win + dj->off + DIR_FSIZE), 0);
     dj->dirsect = dj->sect;
 
