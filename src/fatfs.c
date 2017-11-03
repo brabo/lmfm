@@ -584,6 +584,10 @@ int fatfs_open(const char *path, int flags)
 
     fno->off = 0;
 
+    if (flags & O_TRUNC) {
+        fatfs_truncate(fno, 0);
+    }
+
     int ret = task_filedesc_add(fno);
 
     return ret;

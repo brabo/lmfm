@@ -31,6 +31,7 @@ int fatfs_creat(struct fnode *fno);
 int fatfs_read(struct fnode *fno, void *buf, unsigned int len);
 int fatfs_write(struct fnode *fno, const void *buf, unsigned int len);
 int fatfs_seek(struct fnode *fno, int off, int whence);
+int fatfs_truncate(struct fnode *fno, unsigned int len);
 int fatfs_close(struct fnode *fno);
 
 #endif
