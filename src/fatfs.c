@@ -110,6 +110,7 @@ struct fatfs_dir {
 #define FAT16   2
 #define FAT32   3
 #define EOC32   0x0FFFFFF8
+#define DDEM                0xE5    /* Deleted directory entry mark */
 
 #define FATENT_SIZE  4
 #define DIRENT_SIZE  0x20
@@ -889,6 +890,20 @@ int fatfs_truncate(struct fnode *fno, unsigned int len)
     return 0;
 }
 
+int fatfs_unlink(struct fnode *fno)
+{
+    if (!fno || !fno->priv)
+        return -EINVAL;
+
+    struct fatfs_priv *priv = (struct fatfs_priv *)fno->priv;
+    struct fatfs_disk *fsd = priv->fsd;
+    struct fatfs *fs = fsd->fs;
+
+    disk_read(fsd, fs->win, priv->dirsect, 0, fs->bps);
+    fs->win[priv->off] = DDEM;
+    disk_write(fsd, fs->win, priv->dirsect, 0, fs->bps);
+}
+
 int fatfs_close(struct fnode *fno)
 {
     if (!fno)
@@ -912,10 +927,11 @@ int fatfs_init(void)
     mod_fatfs.ops.seek = fatfs_seek;
     mod_fatfs.ops.truncate = fatfs_truncate;
     mod_fatfs.ops.close = fatfs_close;
+    mod_fatfs.ops.unlink = fatfs_unlink;
     //mod_fatfs.ops.poll = fatfs_poll;
 
     /*
-    mod_fatfs.ops.unlink = fatfs_unlink;
+
     mod_fatfs.ops.exe = fatfs_exe;
     */
 
