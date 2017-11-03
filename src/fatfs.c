@@ -582,11 +582,7 @@ int fatfs_open(const char *path, int flags)
     struct fatfs_priv *priv = (struct fatfs_priv *)fno->priv;
     priv->flags = flags;
 
-    if (flags & O_APPEND) {
-        fno->off = fno->size;
-    } else {
-        fno->off = 0;
-    }
+    fno->off = 0;
 
     int ret = task_filedesc_add(fno);
 
@@ -774,6 +770,8 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
     } else {
         off = fno->off;
     }
+
+    fno->off = off;
 
     sect = off / fs->bps;
     off = off & (fs->bps - 1);
