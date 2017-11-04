@@ -116,6 +116,9 @@ struct fatfs_dir {
 #define EOC32   0x0FFFFFF8
 #define DDEM    0xE5
 
+#define PATHN_MAX 256
+#define SFN_MAX     12
+
 /* Entry sizes in bytes */
 #define FATENT_SIZE  4
 #define DIRENT_SIZE  0x20
@@ -124,6 +127,8 @@ struct fatfs_dir {
 #define LD_DWORD(ptr)       (uint32_t)(*(uint32_t *)(ptr))
 
 #define CLUST2SECT(f, c) (((c - 2) * f->spc + f->database))
+
+int fatfs_truncate(struct fnode *fno, unsigned int len);
 
 static void st_word(uint8_t *ptr, uint16_t val)  /* Store a 2-byte word in little-endian */
 {
@@ -897,7 +902,6 @@ int fatfs_truncate(struct fnode *fno, unsigned int len)
 
 int fatfs_unlink(struct fnode *fno)
 {
-    printf("fatfs_unlink called!\n");
     if (!fno || !fno->priv)
         return -EINVAL;
 

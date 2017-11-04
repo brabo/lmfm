@@ -69,16 +69,30 @@ int main(int argc, char **argv)
     ls("/mnt/BARDIR/");
 
     //char *buf = "GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
-    uint8_t *buf = malloc(14096 * sizeof (uint8_t));
-    memset(buf, 'Z', 14096);
+    //uint8_t *buf = malloc(14096 * sizeof (uint8_t));
+    //memset(buf, 'Z', 14096);
     //mk_file("/mnt/DAARR", buf, 14096);
     //edit_file("/mnt/ZRR");
     //cat("/mnt/GRR");
     //rm("/mnt/CAARR");
     ls("/mnt/");
 
+    struct fnode *fno = vfs_open("/mnt/log01", O_CREAT | O_RDWR | O_TRUNC);
+    if (!fno)
+        return -2;
+
+    uint8_t *buf = malloc(14096 * sizeof (uint8_t));
+    memset(buf, 'X', 14096);
+
+    int ret = vfs_write(fno, buf, 14096);
+    printf("wrote %d bytes!\n", ret);
+
+    fatfs_close(fno);
+    cat("/mnt/log01");
+
     mb_close();
 
+    free(buf);
     free(fs);
 
     // if you're happy and you know it,
