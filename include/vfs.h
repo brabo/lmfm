@@ -67,6 +67,7 @@ struct fnode *fno_mkdir(struct module *owner, const char *name, struct fnode *pa
 int fno_fullpath(struct fnode *f, char *dst, int len);
 void fno_unlink(struct fnode *fno);
 
+int vfs_unlink(void *arg1);
 struct fnode *vfs_opendir(void *arg1);
 int vfs_readdir(void *arg1, void* arg2, void *arg3);
 int vfs_closedir(void *arg1);

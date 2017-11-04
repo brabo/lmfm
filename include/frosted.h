@@ -39,11 +39,16 @@ static int print_array(uint8_t *buf, int len)
 #define krealloc(p,s) realloc(p,s)
 #define kfree(p) free(p)
 #define task_filedesc_add(f) 3
-#define register_module(m) 0
 
 #define FAMILY_FILE 0xFFFF
 #define MODNAME_SIZE 32
 #define CONFIG_FAT32 1
+
+/* Modules */
+struct module *MODS;
+int register_module(struct module *m);
+int unregister_module(struct module *m);
+struct module *module_search(char *name);
 
 struct module {
     uint16_t family;

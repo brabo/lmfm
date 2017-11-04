@@ -69,11 +69,13 @@ int main(int argc, char **argv)
     ls("/mnt/BARDIR/");
 
     //char *buf = "GGRR: the quick brown fox jumps\nover the lazy dog!!!\n";
-    //uint8_t *buf = malloc(14096 * sizeof (uint8_t));
-    //memset(buf, 'Z', 14096);
-    //mk_file("/mnt/GRR", buf, 14096);
+    uint8_t *buf = malloc(14096 * sizeof (uint8_t));
+    memset(buf, 'Z', 14096);
+    //mk_file("/mnt/DAARR", buf, 14096);
     //edit_file("/mnt/ZRR");
-    cat("/mnt/GRR");
+    //cat("/mnt/GRR");
+    //rm("/mnt/CAARR");
+    ls("/mnt/");
 
     mb_close();
 

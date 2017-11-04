@@ -244,3 +244,15 @@ int edit_file(char *path)
 
     return res;
 }
+
+int rm(char *path)
+{
+    if (!path)
+        return -1;
+
+    printf("\nC:\\RM %s\n", path);
+
+    int ret = vfs_unlink(path);
+
+    return ret;
+}

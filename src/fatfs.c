@@ -181,8 +181,8 @@ int get_fat(struct fatfs_disk *fsd, int clust)
     case FAT16:
         break;
     case FAT32:
-        if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / FATENT_SIZE))), 0, fs->bps) < 0) break;
-
+        if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / FATENT_SIZE))), 0, fs->bps) < 0)
+            break;
         return (LD_DWORD(fs->win + ((clust * FATENT_SIZE) & (fs->bps - 1))) & 0x0FFFFFFF);
     }
     return -EMEDIUMTYPE;
@@ -205,7 +205,8 @@ int set_fat(struct fatfs_disk *fsd, uint32_t clust, uint32_t val)
     case FAT16:
         break;
     case FAT32:
-        if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / FATENT_SIZE))), 0, fs->bps) < 0) break;
+        if (disk_read(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / FATENT_SIZE))), 0, fs->bps) < 0)
+            break;
         st_dword((fs->win + ((clust * FATENT_SIZE) & (fs->bps - 1))), (uint32_t)(val & 0x0FFFFFFF));
         disk_write(fsd, fs->win, (fs->fatbase + (clust / (fs->bps / FATENT_SIZE))), 0, fs->bps);
         return 0;
@@ -314,38 +315,43 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
         if (!*off) /* Free FAT entry, no more FAT entries! */
             return -2;
 
+        if (off[0] == DDEM) {
+            dj->off += DIRENT_SIZE;
+            continue;
+        }
+
         if (*(off + DIR_ATTR) & 0x0F) { /* LFN entry */
             dj->off += DIRENT_SIZE;
             continue;
-        } else {
-            int i;
-            char *p = dj->fn;
-            memset(dj->fn, 0x00, (SFN_MAX + 1));
-            char c;
+        }
 
-            for (i = 0; i < 8; i++) {   /* Copy file name body */
+        int i;
+        char *p = dj->fn;
+        memset(dj->fn, 0x00, (SFN_MAX + 1));
+        char c;
+
+        for (i = 0; i < 8; i++) {   /* Copy file name body */
+            c = off[i];
+            if (c == ' ') break;
+            if (c == 0x05) c = 0xE5;
+            *p++ = c;
+        }
+
+        if (off[8] != ' ') {        /* Copy file name extension */
+            *p++ = '.';
+            for (i = 8; i < 11; i++) {
                 c = off[i];
                 if (c == ' ') break;
-                if (c == 0x05) c = 0xE5;
                 *p++ = c;
             }
-
-            if (off[8] != ' ') {        /* Copy file name extension */
-                *p++ = '.';
-                for (i = 8; i < 11; i++) {
-                    c = off[i];
-                    if (c == ' ') break;
-                    *p++ = c;
-                }
-            }
-
-            dj->attr = *(off + DIR_ATTR);
-            dj->sclust = get_clust(fs, off);
-            dj->fsize = LD_DWORD(off + DIR_FSIZE);
-            dj->dirsect = dj->sect;
-
-            break;
         }
+
+        dj->attr = *(off + DIR_ATTR);
+        dj->sclust = get_clust(fs, off);
+        dj->fsize = LD_DWORD(off + DIR_FSIZE);
+        dj->dirsect = dj->sect;
+
+        break;
     }
 
     return 0;
@@ -420,9 +426,9 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
         struct fnode *newdir;
 
         if (dj.attr & AM_DIR)
-            newdir = fno_mkdir(NULL, dj.fn, parent);
+            newdir = fno_mkdir(&mod_fatfs, dj.fn, parent);
         else
-            newdir = fno_create(NULL, dj.fn, parent);
+            newdir = fno_create(&mod_fatfs, dj.fn, parent);
 
         if (!newdir)
             continue;
@@ -484,9 +490,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
      if ((tgt_dir->flags & FL_DIR) == 0)
         return -ENOTDIR;
 
-    if (!src_dev || !(src_dev ->owner)
-            //|| ((src_dev->flags & FL_BLK) == 0)
-            ) {
+    if (!src_dev || !(src_dev ->owner) || ((src_dev->flags & FL_BLK) == 0)) {
         /* Invalid block device. */
         return -ENOENT;
     }
@@ -512,7 +516,7 @@ int fatfs_mount(char *source, char *tgt, uint32_t flags, void *arg)
 
     /* Associate the mount point */
     fsd->mountpoint = tgt_dir;
-    //tgt_dir->owner = &mod_fatfs;
+    tgt_dir->owner = &mod_fatfs;
     fs->bsect = 0;
 
     disk_read(fsd, fs->win, fs->bsect, 0, DEFBPS);
@@ -649,8 +653,8 @@ static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
 
         while ((*path != '/') && (*path != ' ') && (*path != 0x00)) {
             *tpathp++ = *path++;
-
         }
+
         *tpathp = 0x00;
         res = dir_find(fsd, dj, tpath);
         if (*path == '/')
@@ -743,6 +747,7 @@ int fatfs_read(struct fnode *fno, void *buf, unsigned int len)
         if (fno->off + r > fno->size)
             r = fno->size - fno->off;
 
+        /* XXX: use returned value, maybe lower level returned less.. */
         disk_read(fsd, ((uint8_t *)buf + r_len), (priv->sect + sect), off, r);
 
         r_len += r;
@@ -892,6 +897,7 @@ int fatfs_truncate(struct fnode *fno, unsigned int len)
 
 int fatfs_unlink(struct fnode *fno)
 {
+    printf("fatfs_unlink called!\n");
     if (!fno || !fno->priv)
         return -EINVAL;
 

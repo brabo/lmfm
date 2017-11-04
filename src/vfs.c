@@ -160,32 +160,26 @@ static int path_abs(char *src, char *dst, int len)
 
 static struct fnode *fno_create_file(char *path)
 {
-    char *base = malloc(MAX_FILE);
+    char *base = kalloc(strlen(path) + 1);
     struct module *owner = NULL;
     struct fnode *parent;
     struct fnode *f = NULL;
-
     if (!base)
         return NULL;
-
     basename_r(path, base);
     parent = fno_search(base);
-    free(base);
-
+    kfree(base);
     if (!parent)
         return NULL;
-
     if ((parent->flags & FL_DIR) == 0)
         return NULL;
 
     if (parent) {
         owner = parent->owner;
     }
-
-    f = _fno_create(owner, filename(path), parent);
+    f = fno_create(owner, filename(path), parent);
     if (f)
         f->flags = 0;
-
     return f;
 }
 
@@ -197,6 +191,12 @@ void fno_unlink(struct fnode *fno)
         return;
     dir = fno->parent;
 
+    if (fno && fno->owner && fno->owner->ops.unlink)
+        fno->owner->ops.unlink(fno);
+
+    if (!fno)
+        return;
+
     if (dir) {
         struct fnode *child = dir->children;
         while (child) {
@@ -204,7 +204,6 @@ void fno_unlink(struct fnode *fno)
                 dir->children = fno->next;
                 break;
             }
-
             if (child->next == fno) {
                 child->next = fno->next;
                 break;
@@ -213,8 +212,9 @@ void fno_unlink(struct fnode *fno)
         }
     }
 
-    free(fno->fname);
-    free(fno);
+
+    kfree(fno->fname);
+    kfree(fno);
 }
 
 static struct fnode *fno_link(char *src, char *dst)
@@ -375,22 +375,25 @@ struct fnode *fno_search(const char *_path)
     return fno;
 }
 
+struct fnode *fno_search_nofollow(const char *path)
+{
+    return _fno_search(path, &FNO_ROOT, 0);
+}
+
 static struct fnode *_fno_create(struct module *owner, const char *name, struct fnode *parent)
 {
-    struct fnode *fno = calloc(sizeof(struct fnode), 1);
+    struct fnode *fno = kcalloc(sizeof(struct fnode), 1);
     int nlen = strlen(name);
-
     if (!fno)
         return NULL;
 
-    fno->fname = malloc((nlen + 1) * sizeof (char));
+    fno->fname = kalloc(nlen + 1);
     if (!fno->fname){
-        free(fno);
+        kfree(fno);
         return NULL;
     }
 
     memcpy(fno->fname, name, nlen + 1);
-
     if (!parent) {
         parent = &FNO_ROOT;
     }
@@ -398,17 +401,17 @@ static struct fnode *_fno_create(struct module *owner, const char *name, struct 
     fno->parent = parent;
     fno->next = fno->parent->children;
     fno->parent->children = fno;
+
     fno->children = NULL;
     fno->owner = owner;
-
     return fno;
 }
 
 struct fnode *fno_create(struct module *owner, const char *name, struct fnode *parent)
 {
     struct fnode *fno = _fno_create(owner, name, parent);
-//    if (fno && parent && parent->owner && parent->owner->ops.creat)
-//        parent->owner->ops.creat(fno);
+    if (fno && parent && parent->owner && parent->owner->ops.creat)
+        parent->owner->ops.creat(fno);
     fno->flags |= FL_RDWR;
     return fno;
 }
@@ -439,6 +442,24 @@ struct fnode *fno_mkdir(struct module *owner, const char *name, struct fnode *pa
     mkdir_links(fno);
     return fno;
 }
+
+int vfs_unlink(void *arg1)
+{
+    char *path = (char *)arg1;
+    printf("Trying to rm %s\n", path);
+    char abs_p[MAX_FILE];
+    struct fnode *f;
+//    if (task_ptr_valid(path))
+//        return -EACCES;
+    path_abs(path, abs_p, MAX_FILE);
+    f = fno_search(path); /* Don't follow symlink */
+    if (f) {
+        fno_unlink(f);
+        return 0;
+    }
+    return -ENOENT;
+}
+
 
 struct fnode *vfs_opendir(void *arg1)
 {
@@ -525,6 +546,27 @@ int vfs_stat(char *path, struct stat *st)
 
 int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *args)
 {
+    struct module *m;
+    if (!module || !target)
+        return -ENOMEDIUM;
+    m = module_search(module);
+    if (!m || !m->mount)
+        return -EOPNOTSUPP;
+    if (m->mount(source, target, flags, args) == 0) {
+        struct mountpoint *mp = kalloc(sizeof(struct mountpoint));
+        if (mp) {
+            mp->target = fno_search(target);
+            mp->next = MTAB;
+            MTAB = mp;
+        }
+        return 0;
+    }
+    return -ENOENT;
+}
+
+/*
+int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *args)
+{
     fatfs_mount(source, target, flags, args);
     struct mountpoint *mp = malloc(sizeof(struct mountpoint));
 
@@ -536,6 +578,7 @@ int vfs_mount(char *source, char *target, char *module, uint32_t flags, void *ar
 
     return 0;
 }
+*/
 
 struct fnode *vfs_open(void *arg1, uint32_t arg2)
 {
@@ -556,7 +599,7 @@ struct fnode *vfs_open(void *arg1, uint32_t arg2)
 
     f = fno_create_file(path);
     if (f) {
-        if (!fatfs_creat(f))
+        if (fatfs_open(path, flags))
             return f;
     }
 
@@ -602,7 +645,8 @@ void vfs_init(void)
     char name[4] = "sd0";
     mod_sdio.ops.block_read = mb_read;
     mod_sdio.ops.block_write = mb_write;
-    fno_create(&mod_sdio, name, dev);
+    dev = fno_create(&mod_sdio, name, dev);
+    dev->flags |= FL_BLK;
 
 //    memset(&SdCard[0], 0, sizeof(struct dev_sd));
     printf("Found SD card in microSD slot.\r\n");
@@ -619,5 +663,7 @@ void vfs_init(void)
 
     /* Init "/mnt" dir */
     dev = fno_mkdir(NULL, "mnt", NULL);
+
+    fatfs_init();
 }
 
