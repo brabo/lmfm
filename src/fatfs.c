@@ -33,7 +33,7 @@ struct fatfs_priv {
     uint32_t            sclust;
     uint32_t            cclust;
     uint32_t            sect;
-    uint32_t            off;
+    uint32_t            diroff;
     uint32_t            dirsect;
     struct fatfs_disk   *fsd;
     uint32_t            *fat;
@@ -449,7 +449,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
         priv->cclust = dj.cclust;
         priv->sect = dj.sect;
         priv->fsd = f;
-        priv->off = dj.off;
+        priv->diroff = dj.off;
         priv->dirsect = dj.dirsect;
 
         newdir->size = dj.fsize;
@@ -713,7 +713,7 @@ int fatfs_creat(struct fnode *fno)
     priv->fat = kcalloc(3, sizeof (uint32_t));
     priv->fat[0] = priv->sclust;
     priv->sect = CLUST2SECT(fs, priv->cclust);
-    priv->off = dj.off;
+    priv->diroff = dj.off;
     fno->off = 0;
     fno->size = 0;
     priv->dirsect = dj.dirsect;
@@ -841,7 +841,7 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
     if (fno->off > fno->size) {
         fno->size = fno->off;
         disk_read(fsd, fs->win, priv->dirsect, 0, fs->bps);
-        st_dword((fs->win + priv->off + DIR_FSIZE), (uint32_t)fno->size);
+        st_dword((fs->win + priv->diroff + DIR_FSIZE), (uint32_t)fno->size);
         disk_write(fsd, fs->win, priv->dirsect, 0, fs->bps);
     }
 
@@ -910,7 +910,7 @@ int fatfs_unlink(struct fnode *fno)
     struct fatfs *fs = fsd->fs;
 
     disk_read(fsd, fs->win, priv->dirsect, 0, fs->bps);
-    fs->win[priv->off] = DDEM;
+    fs->win[priv->diroff] = DDEM;
     disk_write(fsd, fs->win, priv->dirsect, 0, fs->bps);
 }
 
@@ -942,5 +942,3 @@ int fatfs_init(void)
     register_module(&mod_fatfs);
     return 0;
 }
-
-
