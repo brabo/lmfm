@@ -809,7 +809,7 @@ int fatfs_write(struct fnode *fno, const void *buf, unsigned int len)
         if ((r == fs->bps) && off > 0)
             r -= off;
 
-        disk_write(fsd, buf, (priv->sect + sect), off, r);
+        disk_write(fsd, ((uint8_t *)buf + w_len), (priv->sect + sect), off, r);
         w_len += r;
         fno->off += r;
         off += r;
