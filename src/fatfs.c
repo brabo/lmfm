@@ -30,6 +30,7 @@ struct fatfs_disk {
 };
 
 struct fatfs_priv {
+    uint8_t             *fn;
     uint32_t            sclust;
     uint32_t            cclust;
     uint32_t            sect;
@@ -38,6 +39,8 @@ struct fatfs_priv {
     struct fatfs_disk   *fsd;
     uint32_t            *fat;
     uint32_t            flags;
+    uint32_t            attr;
+    uint32_t            fsize;
 };
 
 struct fatfs {
@@ -53,17 +56,6 @@ struct fatfs {
     uint32_t    n_fatent;
     uint32_t    nclusts;
     uint8_t     mounted;
-};
-
-struct fatfs_dir {
-    uint8_t     *fn;
-    uint32_t    sclust;
-    uint32_t    cclust;
-    uint32_t    sect;
-    uint32_t    off;
-    uint32_t    dirsect;
-    uint32_t    attr;
-    uint32_t    fsize;
 };
 
 #ifdef CONFIG_FAT32
@@ -281,7 +273,7 @@ static int init_fat(struct fatfs_disk *fsd)
     return clust;
 }
 
-static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
+static int dir_rewind(struct fatfs *fs, struct fatfs_priv *dj)
 {
     if (!fs || !dj)
         return -EINVAL;
@@ -294,39 +286,39 @@ static int dir_rewind(struct fatfs *fs, struct fatfs_dir *dj)
     else
         dj->sect = CLUST2SECT(fs, dj->cclust);
 
-    dj->off = 0 - DIRENT_SIZE;
+    dj->diroff = 0 - DIRENT_SIZE;
 
     return 0;
 }
 
-static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
+static int dir_read(struct fatfs_disk *fsd, struct fatfs_priv *dj)
 {
     if (!fsd || !dj)
         return -EINVAL;
 
     struct fatfs *fs = fsd->fs;
 
-    dj->off += DIRENT_SIZE;
-    if (dj->off >= fs->bps) {
+    dj->diroff += DIRENT_SIZE;
+    if (dj->diroff >= fs->bps) {
         dj->sect++;
-        dj->off = 0;
+        dj->diroff = 0;
     }
 
     disk_read(fsd, fs->win, (dj->sect), 0, fs->bps);
 
     /* have to check cluster borders! */
     while (2 > 1) {
-        uint8_t *off = fs->win + dj->off;
-        if (!*off) /* Free FAT entry, no more FAT entries! */
+        uint8_t *diroff = fs->win + dj->diroff;
+        if (!*diroff) /* Free FAT entry, no more FAT entries! */
             return -2;
 
-        if (off[0] == DDEM) {
-            dj->off += DIRENT_SIZE;
+        if (diroff[0] == DDEM) {
+            dj->diroff += DIRENT_SIZE;
             continue;
         }
 
-        if (*(off + DIR_ATTR) & 0x0F) { /* LFN entry */
-            dj->off += DIRENT_SIZE;
+        if (*(diroff + DIR_ATTR) & 0x0F) { /* LFN entry */
+            dj->diroff += DIRENT_SIZE;
             continue;
         }
 
@@ -336,24 +328,24 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
         char c;
 
         for (i = 0; i < 8; i++) {   /* Copy file name body */
-            c = off[i];
+            c = diroff[i];
             if (c == ' ') break;
             if (c == 0x05) c = 0xE5;
             *p++ = c;
         }
 
-        if (off[8] != ' ') {        /* Copy file name extension */
+        if (diroff[8] != ' ') {        /* Copy file name extension */
             *p++ = '.';
             for (i = 8; i < 11; i++) {
-                c = off[i];
+                c = diroff[i];
                 if (c == ' ') break;
                 *p++ = c;
             }
         }
 
-        dj->attr = *(off + DIR_ATTR);
-        dj->sclust = get_clust(fs, off);
-        dj->fsize = LD_DWORD(off + DIR_FSIZE);
+        dj->attr = *(diroff + DIR_ATTR);
+        dj->sclust = get_clust(fs, diroff);
+        dj->fsize = LD_DWORD(diroff + DIR_FSIZE);
         dj->dirsect = dj->sect;
 
         break;
@@ -362,7 +354,7 @@ static int dir_read(struct fatfs_disk *fsd, struct fatfs_dir *dj)
     return 0;
 }
 
-static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
+static int add_dir(struct fatfs *fs, struct fatfs_priv *dj, char *name)
 {
     if (!fs || !dj || !name)
         return -EINVAL;
@@ -371,16 +363,16 @@ static int add_dir(struct fatfs *fs, struct fatfs_dir *dj, char *name)
     if (nlen > SFN_MAX)
         return -ENAMETOOLONG;
 
-    memset((fs->win + dj->off), 0, DIRENT_SIZE);
-    memset((fs->win + dj->off), ' ', 11);
+    memset((fs->win + dj->diroff), 0, DIRENT_SIZE);
+    memset((fs->win + dj->diroff), ' ', 11);
 
     int len = 0;
     while (len < nlen) {
-        *(fs->win + dj->off + len) = name[len++];
+        *(fs->win + dj->diroff + len) = name[len++];
     }
 
-    *(fs->win + dj->off + DIR_ATTR) = DIRENT_SIZE;
-    st_dword((fs->win + dj->off + DIR_FSIZE), 0);
+    *(fs->win + dj->diroff + DIR_ATTR) = DIRENT_SIZE;
+    st_dword((fs->win + dj->diroff + DIR_FSIZE), 0);
     dj->dirsect = dj->sect;
 
     return 0;
@@ -401,7 +393,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
 
     char fbuf[SFN_MAX + 1];
     struct fatfs_priv *priv;
-    struct fatfs_dir dj;
+    struct fatfs_priv dj;
     struct fnode *parent;
     char fpath[PATHN_MAX];
 
@@ -420,7 +412,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
     dj.fn = fbuf;
     dj.cclust = clust;
     dj.sclust = clust;
-    dj.off = 0 - DIRENT_SIZE;
+    dj.diroff = 0 - DIRENT_SIZE;
 
     dir_rewind(f->fs, &dj);
 
@@ -448,8 +440,9 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
         priv->sclust = dj.sclust;
         priv->cclust = dj.cclust;
         priv->sect = dj.sect;
+        priv->attr = dj.attr;
         priv->fsd = f;
-        priv->diroff = dj.off;
+        priv->diroff = dj.diroff;
         priv->dirsect = dj.dirsect;
 
         newdir->size = dj.fsize;
@@ -472,7 +465,7 @@ static void fatfs_populate(struct fatfs_disk *f, char *path, uint32_t clust)
             strcat(fullpath, "/");
             strcat(fullpath, dj.fn);
             path = relative_path(f, fullpath);
-            fatfs_populate(f, path, get_clust(f->fs, (f->fs->win + dj.off)));
+            fatfs_populate(f, path, get_clust(f->fs, (f->fs->win + dj.diroff)));
         }
     }
 }
@@ -608,14 +601,13 @@ int fatfs_open(const char *path, int flags)
     return ret;
 }
 
-static int dir_find(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
+static int dir_find(struct fatfs_disk *fsd, struct fatfs_priv *dj, char *path)
 {
     if (!fsd || !dj || !path)
         return -EINVAL;
 
     while (dir_read(fsd, dj) == 0) {
         if (!strncmp(dj->fn, path, SFN_MAX)) {
-            dj->off;
             uint32_t fat = get_fat(fsd, dj->sclust);
             dj->sect = CLUST2SECT(fsd->fs, dj->sclust);
             dj->cclust = dj->sclust;
@@ -626,7 +618,7 @@ static int dir_find(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
     return -ENOENT;
 }
 
-static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
+static int follow_path(struct fatfs_disk *fsd, struct fatfs_priv *dj, char *path)
 {
     if (!fsd || !dj || !path)
         return -EINVAL;
@@ -646,11 +638,11 @@ static int follow_path(struct fatfs_disk *fsd, struct fatfs_dir *dj, char *path)
 
     res = dir_rewind(fsd->fs, dj);
     if (*path < ' ') {
-        dj->off = 0 - DIRENT_SIZE;
+        dj->diroff = 0 - DIRENT_SIZE;
         return res;
     }
 
-    dj->off = 0 - DIRENT_SIZE;
+    dj->diroff = 0 - DIRENT_SIZE;
 
     do {
         char tpath[SFN_MAX + 1];
@@ -677,7 +669,7 @@ int fatfs_creat(struct fnode *fno)
     if (!((struct fatfs_priv *)fno->parent->priv)->fsd->fs->mounted)
         return -EINVAL;
 
-    struct fatfs_dir dj;
+    struct fatfs_priv dj;
     char fbuf[SFN_MAX + 1];
     char *path = kalloc(PATHN_MAX * sizeof (char));
 
@@ -694,7 +686,7 @@ int fatfs_creat(struct fnode *fno)
     struct fatfs_disk *fsd = priv->fsd;
     fno->priv = priv;
     dj.fn = fbuf;
-    dj.off = 0 - DIRENT_SIZE;
+    dj.diroff = 0 - DIRENT_SIZE;
 
     uint32_t clust = init_fat(fsd);
     follow_path(fsd, &dj, path);
@@ -706,14 +698,14 @@ int fatfs_creat(struct fnode *fno)
     path++;
 
     int ret = add_dir(fs, &dj, path);
-    set_clust(fs, (fs->win + dj.off), clust);
+    set_clust(fs, (fs->win + dj.diroff), clust);
     disk_write(fsd, fs->win, dj.sect, 0, fs->bps);
 
     priv->sclust = priv->cclust = clust;
     priv->fat = kcalloc(3, sizeof (uint32_t));
     priv->fat[0] = priv->sclust;
     priv->sect = CLUST2SECT(fs, priv->cclust);
-    priv->diroff = dj.off;
+    priv->diroff = dj.diroff;
     fno->off = 0;
     fno->size = 0;
     priv->dirsect = dj.dirsect;
